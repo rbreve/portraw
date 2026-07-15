@@ -1,0 +1,402 @@
+:root {
+  --bg: #1a1a1d;
+  --panel: #232327;
+  --panel-edge: #2f2f35;
+  --text: #d8d8dc;
+  --text-dim: #8c8c94;
+  --accent: #5b9dd9;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app {
+  display: flex;
+  height: 100vh;
+}
+
+/* --- viewport ------------------------------------------------------------ */
+
+#viewport {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: #101012;
+}
+
+#view {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--text-dim);
+  border: 2px dashed var(--panel-edge);
+  margin: 16px;
+  border-radius: 12px;
+  pointer-events: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+#drop-overlay.drag-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#drop-overlay.hidden {
+  display: none;
+}
+
+#drop-overlay p {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* --- sidebar --------------------------------------------------------------- */
+
+#sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--panel-edge);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+#sidebar h1 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+#sidebar h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+#status {
+  margin: 10px 0 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  min-height: 1.2em;
+}
+
+.file-button {
+  display: inline-block;
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* --- sliders --------------------------------------------------------------- */
+
+.slider-row {
+  display: grid;
+  grid-template-columns: 82px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.slider-row label {
+  color: var(--text);
+}
+
+.slider-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* --- toggles --------------------------------------------------------------- */
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* --- presets ------------------------------------------------------------------ */
+
+.preset-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preset-save-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.preset-name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  background: #1c1c20;
+  color: var(--text);
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.preset-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.preset-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preset-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.preset-icon-wrap {
+  position: relative;
+}
+
+.preset-icon {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.preset-icon:hover {
+  filter: brightness(1.12);
+}
+
+.preset-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 13px;
+  border-radius: 50%;
+  background: #36363d;
+  color: var(--text);
+  border: 1px solid var(--panel-edge);
+  cursor: pointer;
+}
+
+.preset-icon-wrap:hover .preset-delete {
+  display: flex;
+}
+
+/* --- color mixer -------------------------------------------------------------- */
+
+.color-mixer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mixer-swatches {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 6px 8px;
+}
+
+.mixer-swatch {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--swatch);
+  cursor: pointer;
+}
+
+.mixer-swatch:hover {
+  background: var(--swatch);
+  filter: brightness(1.2);
+}
+
+.mixer-swatch.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+.mixer-zones {
+  display: flex;
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mixer-zone {
+  position: relative;
+  flex: 1;
+  padding: 5px 0 8px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.mixer-zone + .mixer-zone {
+  border-left: 1px solid var(--panel-edge);
+}
+
+.mixer-zone:hover {
+  background: #36363d;
+}
+
+.mixer-zone.selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Dot marking a band/zone that holds non-zero adjustments. */
+.mixer-swatch.has-edits::after,
+.mixer-zone.has-edits::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.mixer-swatch.has-edits::after {
+  bottom: -8px;
+}
+
+.mixer-zone.has-edits::after {
+  bottom: 3px;
+}
+
+.mixer-zone.selected.has-edits::after {
+  background: #fff;
+}
+
+/* --- curve editor ----------------------------------------------------------- */
+
+.curve-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.curve-svg {
+  width: 100%;
+  aspect-ratio: 1;
+  background: #1c1c20;
+  border: 1px solid var(--panel-edge);
+  border-radius: 8px;
+  /* Rounded corners on a root <svg> also clip hit-testing there by default
+     (overflow: hidden is the UA default for outermost svg). The curve's
+     endpoints sit exactly at those corners, so without this they'd have a
+     dead zone where pointerdown can't land. */
+  overflow: visible;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.curve-grid line {
+  stroke: #2c2c32;
+  stroke-width: 1;
+}
+
+.curve-histogram {
+  fill: #3b3b44;
+  stroke: none;
+}
+
+.curve-path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.curve-handle {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 2;
+  cursor: grab;
+}
+
+/* --- buttons ------------------------------------------------------------------ */
+
+button {
+  padding: 6px 14px;
+  background: #36363d;
+  color: var(--text);
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+button:hover {
+  background: #41414a;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#export-panel {
+  display: flex;
+  gap: 8px;
+}

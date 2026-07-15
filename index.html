@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>raw lite — DNG editor</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <main id="viewport">
+        <canvas id="view"></canvas>
+        <div id="drop-overlay">
+          <p><strong>Drop a DNG file</strong></p>
+          <p>or use “Open RAW…” in the panel</p>
+        </div>
+      </main>
+
+      <aside id="sidebar">
+        <header>
+          <h1>raw lite</h1>
+          <label class="file-button">
+            Open RAW…
+            <input id="file-input" type="file" accept=".dng,.DNG" hidden />
+          </label>
+          <p id="status">No image loaded</p>
+        </header>
+
+        <section>
+          <h2>Develop</h2>
+          <div id="sliders"></div>
+        </section>
+
+        <section>
+          <h2>Presets</h2>
+          <div id="preset-panel"></div>
+        </section>
+
+        <section>
+          <h2>Color mixer</h2>
+          <div id="color-mixer-panel"></div>
+        </section>
+
+        <section>
+          <h2>Tone curve</h2>
+          <div id="curve-panel"></div>
+        </section>
+
+        <section>
+          <h2>Debug</h2>
+          <div id="debug-panel"></div>
+        </section>
+
+        <section>
+          <h2>Export</h2>
+          <div id="export-panel">
+            <button id="export-jpeg">JPEG</button>
+            <button id="export-png">PNG</button>
+          </div>
+        </section>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
