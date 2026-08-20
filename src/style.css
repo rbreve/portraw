@@ -24,6 +24,72 @@ body {
   height: 100vh;
 }
 
+/* --- file browser (left panel) ---------------------------------------------- */
+
+#file-browser {
+  width: 260px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border-right: 1px solid var(--panel-edge);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.15s ease;
+}
+
+#file-browser.collapsed {
+  width: 44px;
+}
+
+.file-browser-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px;
+  flex-shrink: 0;
+}
+
+.file-browser-header h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+#file-browser.collapsed .file-browser-header h2,
+#file-browser.collapsed #folder-panel {
+  display: none;
+}
+
+.icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+}
+
+.icon-button:hover {
+  background: var(--panel-edge);
+  color: var(--text);
+}
+
+#folder-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 12px;
+  min-height: 0;
+}
+
 /* --- viewport ------------------------------------------------------------ */
 
 #viewport {
@@ -114,6 +180,68 @@ body {
   border-radius: 6px;
   cursor: pointer;
   font-weight: 500;
+}
+
+/* --- folder browser -------------------------------------------------------- */
+
+.folder-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.folder-panel > button {
+  flex-shrink: 0;
+}
+
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+}
+
+.folder-list:empty {
+  display: none;
+  border: none;
+}
+
+.folder-item {
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
+  padding: 7px 10px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-item:hover {
+  background: var(--panel-edge);
+}
+
+.folder-item.selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.folder-empty {
+  margin: 0;
+  padding: 6px 10px;
+  color: var(--text-dim);
+  font-size: 12px;
 }
 
 /* --- sliders --------------------------------------------------------------- */

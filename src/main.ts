@@ -3,6 +3,7 @@
 import { GlRenderer } from './gl';
 import { makeBoundSlider, makeToggle, type SliderHandle } from './controls';
 import { ColorMixerPanel } from './colorMixer';
+import { FolderPanel } from './folderPanel';
 import { PresetPanel } from './presetPanel';
 import { PresetStore } from './preset';
 import { CurveEditor } from './curve';
@@ -59,6 +60,19 @@ async function loadFile(file: File): Promise<void> {
 fileInput.addEventListener('change', () => {
   const file = fileInput.files?.[0];
   if (file) void loadFile(file);
+});
+
+// --- folder browser ----------------------------------------------------------
+
+const folderPanel = new FolderPanel((file) => void loadFile(file));
+document.querySelector('#folder-panel')!.append(folderPanel.element);
+
+const fileBrowser = document.querySelector<HTMLElement>('#file-browser')!;
+const fileBrowserToggle = document.querySelector<HTMLButtonElement>('#file-browser-toggle')!;
+fileBrowserToggle.addEventListener('click', () => {
+  const collapsed = fileBrowser.classList.toggle('collapsed');
+  fileBrowserToggle.title = collapsed ? 'Show file browser' : 'Hide file browser';
+  fileBrowserToggle.setAttribute('aria-expanded', String(!collapsed));
 });
 
 window.addEventListener('dragover', (e) => {

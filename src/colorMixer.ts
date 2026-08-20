@@ -18,7 +18,10 @@ const SWATCH_COLORS: Record<ColorBand, string> = {
   orange: '#f76b15',
   yellow: '#f5d90a',
   green: '#46a758',
+  aqua: '#00b8d9',
   blue: '#3b82f6',
+  purple: '#8e4ec6',
+  magenta: '#e93d82',
 };
 
 const ZONE_LABELS: Record<ToneZone, string> = {

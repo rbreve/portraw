@@ -8,6 +8,19 @@
   </head>
   <body>
     <div id="app">
+      <aside id="file-browser">
+        <header class="file-browser-header">
+          <button id="file-browser-toggle" class="icon-button" type="button" title="Hide file browser" aria-expanded="true" aria-controls="folder-panel">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3" />
+              <line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+          <h2>Files</h2>
+        </header>
+        <div id="folder-panel"></div>
+      </aside>
+
       <main id="viewport">
         <canvas id="view"></canvas>
         <div id="drop-overlay">

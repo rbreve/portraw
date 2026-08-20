@@ -5,7 +5,16 @@
 // --- color mixer -------------------------------------------------------------
 // Band and zone orders are the contract with the shader's u_colorMix array —
 // gl.ts flattens in exactly this order.
-export const COLOR_BANDS = ['red', 'orange', 'yellow', 'green', 'blue'] as const;
+export const COLOR_BANDS = [
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'aqua',
+  'blue',
+  'purple',
+  'magenta',
+] as const;
 export type ColorBand = (typeof COLOR_BANDS)[number];
 
 export const TONE_ZONES = ['dark', 'mid', 'light'] as const;

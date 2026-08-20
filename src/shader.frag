@@ -38,10 +38,10 @@ uniform float u_saturation;   //  0..2,  1 = unchanged
 
 // --- color mixer --------------------------------------------------------------
 // Per-band HSL adjustments, split by tone zone. Indexed [band * 3 + zone] with
-// bands (red, orange, yellow, green, blue) and zones (dark, mid, light) — the
-// same order as COLOR_BANDS / TONE_ZONES in state.ts, flattened by gl.ts.
-// Each entry is (hue, saturation, luminance), all -1..+1.
-uniform vec3 u_colorMix[15];
+// bands (red, orange, yellow, green, aqua, blue, purple, magenta) and zones
+// (dark, mid, light) — the same order as COLOR_BANDS / TONE_ZONES in state.ts,
+// flattened by gl.ts. Each entry is (hue, saturation, luminance), all -1..+1.
+uniform vec3 u_colorMix[24];
 
 // --- debug toggles -----------------------------------------------------------
 uniform bool u_bypassCurve;   // skip step 5 (isolate curve bugs)
@@ -81,8 +81,9 @@ const float MIX_LUM_RANGE     = 0.6;
 // Band placement on the hue wheel (degrees): center of each band and the
 // distance over which its influence falls off to zero. Bands overlap a little
 // so in-between hues blend contributions from both neighbours.
-const float MIX_BAND_HUE[5]   = float[](0.0, 35.0, 62.0, 120.0, 225.0);
-const float MIX_BAND_WIDTH[5] = float[](40.0, 30.0, 40.0, 65.0, 80.0);
+// Order: red, orange, yellow, green, aqua, blue, purple, magenta.
+const float MIX_BAND_HUE[8]   = float[](0.0, 35.0, 62.0, 120.0, 180.0, 225.0, 275.0, 315.0);
+const float MIX_BAND_WIDTH[8] = float[](55.0, 45.0, 55.0, 70.0, 65.0, 70.0, 60.0, 55.0);
 
 // Tone-zone crossfades in HSL lightness: darks fade out across LO..HI of the
 // first pair, lights fade in across the second; mids fill the remainder.
@@ -163,7 +164,7 @@ vec3 applyColorMix(vec3 c) {
     float midWeight   = 1.0 - darkWeight - lightWeight;
 
     vec3 adjust = vec3(0.0); // accumulated (hue, sat, lum), still -1..+1 scale
-    for (int band = 0; band < 5; band++) {
+    for (int band = 0; band < 8; band++) {
         float hueDistance = abs(mod(hsl.x - MIX_BAND_HUE[band] + 180.0, 360.0) - 180.0);
         float bandWeight = 1.0 - smoothstep(0.0, MIX_BAND_WIDTH[band], hueDistance);
         if (bandWeight <= 0.0) continue;
