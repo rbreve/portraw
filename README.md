@@ -36,6 +36,9 @@ saturation → color grading → output.
 | `src/preset.ts`         | preset model + localStorage store                 |
 | `src/presetPanel.ts`    | presets panel (save by name, icon grid, apply)    |
 | `src/curve.ts`          | SVG curve editor → 256-entry monotone-cubic LUT   |
+| `src/crop.ts`           | interactive crop overlay (arrange, resize, lock)  |
+| `src/exportPanel.ts`    | Instagram-style export framing + border settings  |
+| `src/folderPanel.ts`    | folder browser (File System Access API)           |
 | `src/state.ts`          | the flat `EditState` object                       |
 
 ## Run
@@ -53,17 +56,28 @@ npm run preview  # serve the production build
 
 ## Use
 
-Drop a `.dng` onto the window (or *Open RAW…*). Adjust exposure, highlights,
-shadows, temperature, tint, saturation and the tone curve — all at 60 fps.
-The color mixer targets one of five hue bands (red, orange, yellow, green,
-blue) split into darks / mids / lights, with hue, saturation and luminance
-per cell. Color grading offers a hue/saturation wheel plus a luminance slider
-for each of shadows, midtones and highlights — applied after global
-saturation, so a desaturated image can still be split-toned; its strength and
-zone-mask parameters are tunable in `src/config.ts`. *Save preset* snapshots
-the current develop settings (sliders + color mixer + color grading) under a
-name; its icon shows the name's first three letters on a
-random color. Presets persist in `localStorage`; click one to apply, hover to
-delete.
+Drop a `.dng` onto the window (or *Open RAW…*), or *Open folder…* to browse
+and click through every DNG in a shoot (Chrome/Edge only — the File System
+Access API isn't available in Safari, Firefox, or Brave). Adjust exposure,
+highlights, shadows, temperature, tint, saturation and the tone curve — all
+at 60 fps. The color mixer targets one of eight hue bands (red, orange,
+yellow, green, aqua, blue, purple, magenta) split into darks / mids / lights,
+with hue, saturation and luminance per cell. Color grading offers a
+hue/saturation wheel plus a luminance slider for each of shadows, midtones
+and highlights — applied after global saturation, so a desaturated image can
+still be split-toned; its strength and zone-mask parameters are tunable in
+`src/config.ts`. *Save preset* snapshots the current develop settings
+(sliders + color mixer + color grading) under a name; its icon shows the
+name's first three letters on a random color. Presets persist in
+`localStorage`; click one to apply, hover to delete.
+
+The Crop tab lets you drag out and reposition/resize a rectangle over the
+full image (optionally locked to the source's aspect ratio) before applying
+it; the crop is normalized so it survives export at full resolution. The
+Export tab frames the (possibly cropped) photo for Instagram — original size,
+or centered/scaled into square, horizontal, or vertical canvases at
+Instagram's recommended pixel dimensions, with an optional border — with a
+live preview swatch before you export.
+
 Debug toggles can bypass the curve, show the linear buffer, and overlay
 blown/crushed pixels. Export renders at full resolution to JPEG or PNG.
