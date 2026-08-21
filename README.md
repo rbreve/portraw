@@ -40,6 +40,9 @@ saturation → color grading → output.
 | `src/preset.ts`         | preset model + localStorage store                 |
 | `src/presetPanel.ts`    | presets panel (save by name, icon grid, apply)    |
 | `src/curve.ts`          | SVG curve editor → 256-entry monotone-cubic LUT   |
+| `src/crop.ts`           | interactive crop overlay (arrange, resize, lock)  |
+| `src/exportPanel.ts`    | Instagram-style export framing + border settings  |
+| `src/folderPanel.ts`    | folder browser (File System Access API)           |
 | `src/state.ts`          | the flat `EditState` object                       |
 
 ## Run
@@ -55,19 +58,42 @@ npm run preview  # serve the production build
 > pthreads build needs `SharedArrayBuffer`. Any production host must send the
 > same headers.
 
+## Features
+
+- **Develop sliders** — exposure, highlights, shadows, temperature, tint and
+  saturation, all applied live at 60 fps with no re-decode.
+- **Color mixer** — targeted hue/saturation/luminance adjustments across
+  eight hue bands (red, orange, yellow, green, aqua, blue, purple, magenta),
+  each split into darks / mids / lights.
+- **Color grading** — 3-way shadows/midtones/highlights wheels for
+  hue + saturation tinting, plus a per-zone luminance slider. Applied after
+  global saturation, so a fully desaturated image can still be split-toned.
+  Strength and zone-mask tuning live in `src/config.ts`.
+- **Tone curve** — an SVG curve editor over the image's histogram, with
+  monotone-cubic interpolation baked to a 256-entry LUT.
+- **Crop** — a draggable, resizable overlay over the full image, freeform or
+  locked to the source's aspect ratio; the crop is normalized so it survives
+  export at full resolution.
+- **Folder browser** — pick a folder (Chrome/Edge only, via the File System
+  Access API) and click through every DNG in a shoot without re-opening a
+  file picker each time.
+- **Presets** — *Save preset* snapshots the current develop settings
+  (sliders + color mixer + color grading) under a name, shown as an icon with
+  the name's first three letters on a random color. Presets persist in
+  `localStorage`; click one to apply, hover to delete.
+- **Export** — render the (possibly cropped) photo at full resolution to
+  JPEG or PNG. Optionally add a solid-color border, and/or frame it for
+  Instagram: original size, or centered/scaled (never upscaled) into square
+  (1080×1080), horizontal (1080×566) or vertical (1080×1350) canvases at
+  Instagram's own recommended pixel dimensions, with a live preview swatch
+  before you export.
+- **Debug toggles** — bypass the tone curve, view the pre-gamma linear
+  buffer, or overlay blown/crushed pixels.
+
 ## Use
 
-Drop a `.dng` onto the window (or *Open RAW…*). Adjust exposure, highlights,
-shadows, temperature, tint, saturation and the tone curve — all at 60 fps.
-The color mixer targets one of five hue bands (red, orange, yellow, green,
-blue) split into darks / mids / lights, with hue, saturation and luminance
-per cell. Color grading offers a hue/saturation wheel plus a luminance slider
-for each of shadows, midtones and highlights — applied after global
-saturation, so a desaturated image can still be split-toned; its strength and
-zone-mask parameters are tunable in `src/config.ts`. *Save preset* snapshots
-the current develop settings (sliders + color mixer + color grading) under a
-name; its icon shows the name's first three letters on a
-random color. Presets persist in `localStorage`; click one to apply, hover to
-delete.
-Debug toggles can bypass the curve, show the linear buffer, and overlay
-blown/crushed pixels. Export renders at full resolution to JPEG or PNG.
+Drop a `.dng` onto the window, use *Open RAW…*, or *Open folder…* to browse
+a shoot. Adjust the develop sliders, color mixer, color grading and tone
+curve from the Edit tab; frame and apply a crop from the Crop tab; save/apply
+snapshots from the Presets tab; and pick a format, border and destination
+file type from the Export tab.
