@@ -86,6 +86,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 10px;
   padding: 0 12px 12px;
   min-height: 0;
 }
@@ -172,17 +173,76 @@ body {
   min-height: 1.2em;
 }
 
-.file-button {
-  display: inline-block;
-  padding: 6px 14px;
+.tab-panel {
+  display: none;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tab-panel.active {
+  display: flex;
+}
+
+/* --- tool rail (far right) -------------------------------------------------- */
+
+#tool-rail {
+  width: 64px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-left: 1px solid var(--panel-edge);
+  display: flex;
+  flex-direction: column;
+  padding: 10px 8px;
+  gap: 6px;
+}
+
+.tool-rail-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 4px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-dim);
+}
+
+.tool-rail-button span {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.tool-rail-button:hover {
+  background: var(--panel-edge);
+  color: var(--text);
+}
+
+.tool-rail-button.selected {
   background: var(--accent);
   color: #fff;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
 }
 
 /* --- folder browser -------------------------------------------------------- */
+
+.file-button {
+  display: block;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  text-align: center;
+  background: #36363d;
+  color: var(--text);
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.file-button:hover {
+  background: #41414a;
+}
 
 .folder-panel {
   display: flex;
@@ -457,6 +517,77 @@ input[type='range'] {
   background: #fff;
 }
 
+/* --- color grading ------------------------------------------------------------ */
+
+.color-grade {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.grade-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.grade-zone-label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.grade-wheel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid var(--panel-edge);
+  cursor: crosshair;
+  touch-action: none;
+  /* Hue 0 (red) east, increasing counter-clockwise — matches colorGrade.ts. */
+  background:
+    radial-gradient(circle closest-side, #232327 0%, rgba(35, 35, 39, 0) 100%),
+    conic-gradient(from 90deg, #f00, #f0f, #00f, #0ff, #0f0, #ff0, #f00);
+}
+
+.grade-handle {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #808080;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.grade-handle.has-edits {
+  border-color: var(--accent);
+}
+
+.grade-lum-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.grade-lum-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.grade-lum-value {
+  width: 26px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
 /* --- curve editor ----------------------------------------------------------- */
 
 .curve-editor {
@@ -503,6 +634,143 @@ input[type='range'] {
   cursor: grab;
 }
 
+/* --- crop -------------------------------------------------------------------- */
+
+.crop-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.crop-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.crop-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.crop-hint.hidden {
+  display: none;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented button {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--panel-edge);
+}
+
+.segmented button:hover {
+  background: #36363d;
+}
+
+.segmented button.selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.crop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  touch-action: none;
+}
+
+.crop-overlay.hidden {
+  display: none;
+}
+
+.crop-bounds {
+  position: absolute;
+}
+
+.crop-mask {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.crop-mask-top,
+.crop-mask-bottom {
+  left: 0;
+  right: 0;
+}
+
+.crop-mask-top {
+  top: 0;
+}
+
+.crop-mask-bottom {
+  bottom: 0;
+}
+
+.crop-mask-left {
+  left: 0;
+}
+
+.crop-mask-right {
+  right: 0;
+}
+
+.crop-rect {
+  position: absolute;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  cursor: move;
+}
+
+.crop-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.crop-handle-nw {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+
+.crop-handle-ne {
+  left: 100%;
+  top: 0;
+  cursor: nesw-resize;
+}
+
+.crop-handle-sw {
+  left: 0;
+  top: 100%;
+  cursor: nesw-resize;
+}
+
+.crop-handle-se {
+  left: 100%;
+  top: 100%;
+  cursor: nwse-resize;
+}
+
 /* --- buttons ------------------------------------------------------------------ */
 
 button {
@@ -527,4 +795,51 @@ button:disabled {
 #export-panel {
   display: flex;
   gap: 8px;
+}
+
+/* --- export frame (Instagram formats + border) ------------------------------ */
+
+.export-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.format-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.format-grid button {
+  font-size: 12.5px;
+}
+
+.format-grid button.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.export-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px var(--panel-edge);
+  background: #fff;
+  transition: width 0.1s ease, height 0.1s ease, padding 0.1s ease;
+}
+
+.export-preview.hidden {
+  display: none;
+}
+
+.export-preview-photo {
+  flex-shrink: 0;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #4a4a52, #2c2c32);
 }

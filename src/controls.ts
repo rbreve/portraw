@@ -70,12 +70,17 @@ export function makeSlider(spec: SliderSpec): HTMLElement {
 }
 
 /** Checkbox toggle for the debug switches. */
-export function makeToggle(label: string, onChange: (enabled: boolean) => void): HTMLElement {
+export function makeToggle(
+  label: string,
+  onChange: (enabled: boolean) => void,
+  initialChecked = false,
+): HTMLElement {
   const row = document.createElement('label');
   row.className = 'toggle-row';
 
   const input = document.createElement('input');
   input.type = 'checkbox';
+  input.checked = initialChecked;
   input.addEventListener('change', () => onChange(input.checked));
 
   const text = document.createElement('span');

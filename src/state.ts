@@ -51,6 +51,70 @@ export function cloneColorMixState(source: ColorMixState): ColorMixState {
   return clone;
 }
 
+// --- color grading -----------------------------------------------------------
+// 3-way grade: one wheel per tone zone. Zone order is the contract with the
+// shader's u_colorGrade array — gl.ts flattens in exactly this order.
+export const GRADE_ZONES = ['shadows', 'midtones', 'highlights'] as const;
+export type GradeZone = (typeof GRADE_ZONES)[number];
+
+/**
+ * One wheel of the 3-way color grade. hue is 0..360 degrees on the wheel,
+ * saturation 0..100 (0 = no tint, so hue is irrelevant at rest), luminance
+ * -100..100 (0 = no change).
+ */
+export interface GradeWheel {
+  hue: number;
+  saturation: number;
+  luminance: number;
+}
+
+export type ColorGradeState = Record<GradeZone, GradeWheel>;
+
+export function createDefaultColorGradeState(): ColorGradeState {
+  return Object.fromEntries(
+    GRADE_ZONES.map((zone) => [zone, { hue: 0, saturation: 0, luminance: 0 }]),
+  ) as ColorGradeState;
+}
+
+/** Deep copy so presets and live state never share wheel objects. */
+export function cloneColorGradeState(source: ColorGradeState): ColorGradeState {
+  return Object.fromEntries(
+    GRADE_ZONES.map((zone) => [zone, { ...source[zone] }]),
+  ) as ColorGradeState;
+}
+
+// --- tone curve ------------------------------------------------------------------
+// Control points in normalized [0,1]^2 space (x = input, y = output), the same
+// shape curve.ts's CurveEditor edits directly — kept here so presets/session
+// persistence can save and restore it like any other develop setting.
+export interface CurvePoint {
+  x: number;
+  y: number;
+}
+
+export function createDefaultCurvePoints(): CurvePoint[] {
+  return [
+    { x: 0, y: 0 },
+    { x: 1, y: 1 },
+  ];
+}
+
+/** Deep copy so presets and live state never share point objects. */
+export function cloneCurvePoints(points: CurvePoint[]): CurvePoint[] {
+  return points.map((p) => ({ ...p }));
+}
+
+// --- crop ----------------------------------------------------------------------
+// Normalized to [0,1] against the full decoded image, top-left origin — the
+// same space as the shader's v_uv, so gl.ts can use x/y/width/height directly
+// as a uv offset + scale with no unit conversion.
+export interface CropRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 // --- edit state ----------------------------------------------------------------
 export interface EditState {
   exposureEv: number; //  -5..+5  EV stops
@@ -60,6 +124,10 @@ export interface EditState {
   tint: number; //       -100..100  (+ magenta)
   saturation: number; // -100..100  (0 = unchanged)
   colorMix: ColorMixState;
+  colorGrade: ColorGradeState;
+  curvePoints: CurvePoint[];
+  // null = full, uncropped image.
+  crop: CropRect | null;
   // Debug toggles
   bypassCurve: boolean;
   showLinear: boolean;
@@ -75,16 +143,47 @@ export function createDefaultEditState(): EditState {
     tint: 0,
     saturation: 0,
     colorMix: createDefaultColorMixState(),
+    colorGrade: createDefaultColorGradeState(),
+    curvePoints: createDefaultCurvePoints(),
+    crop: null,
     bypassCurve: false,
     showLinear: false,
     showClipping: false,
   };
 }
 
+/**
+ * Reset every field back to defaults for a newly opened photo. Mutates colorMix
+ * cells in place (like applyPresetSettings) rather than replacing the object,
+ * so existing references — e.g. the color mixer panel — stay valid.
+ */
+export function resetEditState(state: EditState): void {
+  state.exposureEv = 0;
+  state.highlights = 0;
+  state.shadows = 0;
+  state.temperature = 0;
+  state.tint = 0;
+  state.saturation = 0;
+  for (const band of COLOR_BANDS) {
+    for (const zone of TONE_ZONES) {
+      Object.assign(state.colorMix[band][zone], { hue: 0, saturation: 0, luminance: 0 });
+    }
+  }
+  for (const zone of GRADE_ZONES) {
+    Object.assign(state.colorGrade[zone], { hue: 0, saturation: 0, luminance: 0 });
+  }
+  state.curvePoints = createDefaultCurvePoints();
+  state.crop = null;
+  state.bypassCurve = false;
+  state.showLinear = false;
+  state.showClipping = false;
+}
+
 // --- presets -------------------------------------------------------------------
-// A preset stores the develop settings only; debug toggles are session state and
-// deliberately excluded so applying a preset never flips a debug switch.
-export type PresetSettings = Omit<EditState, 'bypassCurve' | 'showLinear' | 'showClipping'>;
+// A preset stores the develop settings only; crop is per-photo geometry and
+// debug toggles are session state, so both are deliberately excluded — applying
+// a preset never reframes the image or flips a debug switch.
+export type PresetSettings = Omit<EditState, 'bypassCurve' | 'showLinear' | 'showClipping' | 'crop'>;
 
 /** Snapshot the develop settings of a live state into a standalone preset. */
 export function capturePresetSettings(state: EditState): PresetSettings {
@@ -96,6 +195,8 @@ export function capturePresetSettings(state: EditState): PresetSettings {
     tint: state.tint,
     saturation: state.saturation,
     colorMix: cloneColorMixState(state.colorMix),
+    colorGrade: cloneColorGradeState(state.colorGrade),
+    curvePoints: cloneCurvePoints(state.curvePoints),
   };
 }
 
@@ -116,5 +217,37 @@ export function applyPresetSettings(state: EditState, settings: PresetSettings):
       Object.assign(state.colorMix[band][zone], settings.colorMix[band][zone]);
     }
   }
+  for (const zone of GRADE_ZONES) {
+    // Presets saved before color grading existed have no colorGrade — treat as neutral.
+    Object.assign(state.colorGrade[zone], settings.colorGrade?.[zone] ?? { hue: 0, saturation: 0, luminance: 0 });
+  }
+  state.curvePoints = cloneCurvePoints(settings.curvePoints);
   return state;
+}
+
+// --- session persistence --------------------------------------------------------
+// The whole live EditState, auto-saved to localStorage so in-progress work
+// (develop settings, crop, debug toggles) survives a reload. Distinct from
+// named presets, which are saved explicitly and store develop settings only.
+const SESSION_STORAGE_KEY = 'portraw:session';
+
+/** Load the last auto-saved session state, merged onto defaults for forward-compat. Null if none/corrupt. */
+export function loadSessionEditState(): EditState | null {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return { ...createDefaultEditState(), ...(parsed as Partial<EditState>) };
+  } catch {
+    return null; // corrupt or unavailable storage — fall back to defaults
+  }
+}
+
+export function persistSessionEditState(state: EditState): void {
+  try {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Storage full or blocked; session simply won't persist.
+  }
 }

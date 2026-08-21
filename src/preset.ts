@@ -11,7 +11,7 @@ export interface Preset {
   settings: PresetSettings;
 }
 
-const STORAGE_KEY = 'raw-lite:presets';
+const STORAGE_KEY = 'portraw:presets';
 
 /** The 3-letter icon label: first three letters of the name, upper-cased. */
 export function presetInitials(name: string): string {

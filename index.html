@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>raw lite — DNG editor</title>
+    <title>portraw — DNG editor</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -18,7 +18,12 @@
           </button>
           <h2>Files</h2>
         </header>
-        <div id="folder-panel"></div>
+        <div id="folder-panel">
+          <label class="file-button">
+            Open RAW…
+            <input id="file-input" type="file" accept=".dng,.DNG" hidden />
+          </label>
+        </div>
       </aside>
 
       <main id="viewport">
@@ -31,46 +36,99 @@
 
       <aside id="sidebar">
         <header>
-          <h1>raw lite</h1>
-          <label class="file-button">
-            Open RAW…
-            <input id="file-input" type="file" accept=".dng,.DNG" hidden />
-          </label>
+          <h1>portraw</h1>
           <p id="status">No image loaded</p>
         </header>
 
-        <section>
-          <h2>Develop</h2>
-          <div id="sliders"></div>
-        </section>
+        <div class="tab-panel" data-tab="edit">
+          <section>
+            <h2>Develop</h2>
+            <div id="sliders"></div>
+          </section>
 
-        <section>
-          <h2>Presets</h2>
-          <div id="preset-panel"></div>
-        </section>
+          <section>
+            <h2>Color mixer</h2>
+            <div id="color-mixer-panel"></div>
+          </section>
 
-        <section>
-          <h2>Color mixer</h2>
-          <div id="color-mixer-panel"></div>
-        </section>
+          <section>
+            <h2>Tone curve</h2>
+            <div id="curve-panel"></div>
+          </section>
 
-        <section>
-          <h2>Tone curve</h2>
-          <div id="curve-panel"></div>
-        </section>
+          <section>
+            <h2>Color grading</h2>
+            <div id="color-grade-panel"></div>
+          </section>
 
-        <section>
-          <h2>Debug</h2>
-          <div id="debug-panel"></div>
-        </section>
+          <section>
+            <h2>Debug</h2>
+            <div id="debug-panel"></div>
+          </section>
+        </div>
 
-        <section>
-          <h2>Export</h2>
-          <div id="export-panel">
-            <button id="export-jpeg">JPEG</button>
-            <button id="export-png">PNG</button>
-          </div>
-        </section>
+        <div class="tab-panel" data-tab="presets">
+          <section>
+            <h2>Presets</h2>
+            <div id="preset-panel"></div>
+          </section>
+        </div>
+
+        <div class="tab-panel" data-tab="crop">
+          <section>
+            <h2>Crop</h2>
+            <div id="crop-panel"></div>
+          </section>
+        </div>
+
+        <div class="tab-panel" data-tab="export">
+          <section>
+            <h2>Frame</h2>
+            <div id="export-frame-panel"></div>
+          </section>
+
+          <section>
+            <h2>Export</h2>
+            <div id="export-panel">
+              <button id="export-jpeg">JPEG</button>
+              <button id="export-png">PNG</button>
+            </div>
+          </section>
+        </div>
+      </aside>
+
+      <aside id="tool-rail">
+        <button class="tool-rail-button" type="button" data-tab="edit" title="Edit" aria-pressed="true">
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+            <line x1="3" y1="2" x2="3" y2="14" stroke="currentColor" stroke-width="1.3" />
+            <circle cx="3" cy="6" r="1.5" fill="none" stroke="currentColor" stroke-width="1.3" />
+            <line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" stroke-width="1.3" />
+            <circle cx="8" cy="10" r="1.5" fill="none" stroke="currentColor" stroke-width="1.3" />
+            <line x1="13" y1="2" x2="13" y2="14" stroke="currentColor" stroke-width="1.3" />
+            <circle cx="13" cy="5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.3" />
+          </svg>
+          <span>Edit</span>
+        </button>
+        <button class="tool-rail-button" type="button" data-tab="presets" title="Presets" aria-pressed="false">
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+            <path d="M4 2.5h8a1 1 0 0 1 1 1V14l-5-3-5 3V3.5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+          </svg>
+          <span>Presets</span>
+        </button>
+        <button class="tool-rail-button" type="button" data-tab="crop" title="Crop" aria-pressed="false">
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+            <path d="M5 1.5v9a1 1 0 0 0 1 1h9" fill="none" stroke="currentColor" stroke-width="1.3" />
+            <path d="M11 14.5v-9a1 1 0 0 0-1-1H1.5" fill="none" stroke="currentColor" stroke-width="1.3" />
+          </svg>
+          <span>Crop</span>
+        </button>
+        <button class="tool-rail-button" type="button" data-tab="export" title="Export" aria-pressed="false">
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+            <path d="M8 1.5v8m0 0l-3-3m3 3l3-3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M2 11.5v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+          </svg>
+          <span>Export</span>
+        </button>
       </aside>
     </div>
     <script type="module" src="/src/main.ts"></script>

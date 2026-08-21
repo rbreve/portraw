@@ -5,7 +5,7 @@
 // splines (Fritsch–Carlson — no overshoot between points) and sampled into a
 // 256-entry LUT which the caller uploads as the shader's curve texture.
 
-type CurvePoint = { x: number; y: number };
+import { createDefaultCurvePoints, type CurvePoint } from './state';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const VIEW = 256; // svg viewBox size; also the LUT size
@@ -27,7 +27,7 @@ export class CurveEditor {
   private lastPointerDownAt = 0;
   private lastPointerDownIndex = -1;
 
-  constructor(private readonly onChange: (lut: Float32Array) => void) {
+  constructor(private readonly onChange: (lut: Float32Array, points: CurvePoint[]) => void) {
     this.svg = document.createElementNS(SVG_NS, 'svg');
     this.svg.setAttribute('viewBox', `0 0 ${VIEW} ${VIEW}`);
     this.svg.classList.add('curve-svg');
@@ -78,10 +78,18 @@ export class CurveEditor {
 
   /** Back to the identity (linear) curve. */
   reset(): void {
-    this.points = [
-      { x: 0, y: 0 },
-      { x: 1, y: 1 },
-    ];
+    this.points = createDefaultCurvePoints();
+    this.rebuild();
+  }
+
+  /** A copy of the current control points (e.g. to persist in a preset/session). */
+  getPoints(): CurvePoint[] {
+    return this.points.map((p) => ({ ...p }));
+  }
+
+  /** Replace the curve with externally-supplied points (e.g. from a loaded preset/session) and redraw. */
+  setPoints(points: CurvePoint[]): void {
+    this.points = points.map((p) => ({ x: clamp01(p.x), y: clamp01(p.y) }));
     this.rebuild();
   }
 
@@ -172,7 +180,7 @@ export class CurveEditor {
       }),
     );
 
-    this.onChange(lut);
+    this.onChange(lut, this.getPoints());
   }
 }
 
