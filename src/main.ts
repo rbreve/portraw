@@ -2,22 +2,65 @@
 // one render() closure. UI events mutate editState then call render().
 import { GlRenderer } from './gl';
 import { makeBoundSlider, makeToggle, type SliderHandle } from './controls';
+import { ColorGradePanel } from './colorGrade';
 import { ColorMixerPanel } from './colorMixer';
+import { CropOverlay } from './crop';
+import { ExportPanel } from './exportPanel';
 import { FolderPanel } from './folderPanel';
 import { PresetPanel } from './presetPanel';
 import { PresetStore } from './preset';
 import { CurveEditor } from './curve';
-import { applyPresetSettings, createDefaultEditState, type EditState } from './state';
+import {
+  applyPresetSettings,
+  createDefaultEditState,
+  loadSessionEditState,
+  persistSessionEditState,
+  resetEditState,
+  type EditState,
+} from './state';
 import type { DecodeRequest, DecodeResponse } from './decode.worker';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
+const viewport = document.querySelector<HTMLElement>('#viewport')!;
 const dropOverlay = document.querySelector<HTMLElement>('#drop-overlay')!;
 const statusLine = document.querySelector<HTMLElement>('#status')!;
 const fileInput = document.querySelector<HTMLInputElement>('#file-input')!;
 
-const editState: EditState = createDefaultEditState();
+const editState: EditState = loadSessionEditState() ?? createDefaultEditState();
 const renderer = new GlRenderer(canvas);
-const render = () => renderer.render(editState);
+
+// Debounced so a slider drag (many render() calls/sec) doesn't hammer
+// localStorage — only the settled value after a short pause gets written.
+let persistTimer: ReturnType<typeof setTimeout> | undefined;
+function schedulePersist(): void {
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => persistSessionEditState(editState), 400);
+}
+window.addEventListener('beforeunload', () => persistSessionEditState(editState));
+
+const render = () => {
+  renderer.render(editState);
+  schedulePersist();
+};
+
+// Base image pixel dimensions (either decode stage — preview/full share the same
+// aspect ratio) — used to compute the (possibly cropped) content aspect for the
+// export frame preview.
+let imgWidth = 0;
+let imgHeight = 0;
+function currentContentAspect(): number {
+  if (!imgWidth || !imgHeight) return 1;
+  const crop = editState.crop;
+  const w = crop ? crop.width * imgWidth : imgWidth;
+  const h = crop ? crop.height * imgHeight : imgHeight;
+  return w / h;
+}
+
+/** Re-sync the export preview's aspect ratio + thumbnail with the current photo/crop/edits. */
+function refreshExportPreview(): void {
+  exportPanel.setPhotoAspect(currentContentAspect());
+  exportPanel.setPhotoThumbnail(renderer.hasImage ? renderer.renderThumbnail(editState, 200) : null);
+}
 
 // --- decode worker (stage 1) -------------------------------------------------
 
@@ -25,15 +68,33 @@ const decodeWorker = new Worker(new URL('./decode.worker.ts', import.meta.url), 
   type: 'module',
 });
 
+// Set whenever a new file starts loading, consumed by the first 'image' message
+// that arrives for it (the preview-stage decode) — NOT the second, full-res
+// 'image' message for that same file, which must not clobber edits made while
+// the preview was up. Resetting is deferred to that message (rather than
+// firing immediately in loadFile) so the old photo's edits never flash back to
+// defaults while the new file is still being read/decoded — a RAW preview with
+// every adjustment zeroed can look dark/flat, which read as "the image reset".
+let resetOnNextImage = false;
+
 decodeWorker.onmessage = ({ data }: MessageEvent<DecodeResponse>) => {
   switch (data.type) {
     case 'status':
       statusLine.textContent = data.message;
       break;
     case 'image':
+      if (resetOnNextImage) {
+        resetOnNextImage = false;
+        resetControlsForNewFile();
+      }
       renderer.setImage(data.width, data.height, data.pixels);
+      cropOverlay.setImageSize(data.width, data.height);
+      if (activeTab === 'crop') cropOverlay.startArranging();
+      imgWidth = data.width;
+      imgHeight = data.height;
       curveEditor.setHistogram(data.histogram);
       render();
+      refreshExportPreview();
       statusLine.textContent =
         data.stage === 'preview'
           ? 'Preview (half size) — decoding full resolution…'
@@ -46,7 +107,21 @@ decodeWorker.onmessage = ({ data }: MessageEvent<DecodeResponse>) => {
   }
 };
 
+/** Reset every develop/crop/debug control back to defaults for the incoming photo. */
+function resetControlsForNewFile(): void {
+  cropOverlay.finishArranging(); // commit (harmlessly overwritten below) rather than leave arranging mid-drag
+  resetEditState(editState);
+  for (const [key, slider] of developSliders) slider.setValue(editState[key]);
+  colorMixerPanel.syncFromState();
+  colorGradePanel.syncFromState();
+  curveEditor.reset();
+  for (const input of document.querySelectorAll<HTMLInputElement>('#debug-panel input[type=checkbox]')) {
+    input.checked = false;
+  }
+}
+
 async function loadFile(file: File): Promise<void> {
+  resetOnNextImage = true;
   dropOverlay.classList.add('hidden');
   statusLine.textContent = `Reading ${file.name}…`;
   setExportEnabled(false);
@@ -74,6 +149,8 @@ fileBrowserToggle.addEventListener('click', () => {
   fileBrowserToggle.title = collapsed ? 'Show file browser' : 'Hide file browser';
   fileBrowserToggle.setAttribute('aria-expanded', String(!collapsed));
 });
+
+let activeTab = 'edit';
 
 window.addEventListener('dragover', (e) => {
   e.preventDefault();
@@ -126,10 +203,38 @@ document.querySelector('#sliders')!.append(
   }),
 );
 
+// --- crop ----------------------------------------------------------------------
+// Arranging always shows the full image (see setCropPreviewActive) so the
+// overlay's coordinate space matches what's on screen regardless of any
+// already-applied crop.
+const cropOverlay = new CropOverlay(viewport, {
+  getCrop: () => editState.crop,
+  onApply: (crop) => {
+    editState.crop = crop;
+    render();
+    refreshExportPreview();
+  },
+  onReset: () => {
+    editState.crop = null;
+    render();
+    refreshExportPreview();
+  },
+  onModeChange: (arranging) => {
+    renderer.setCropPreviewActive(arranging);
+    render();
+  },
+});
+document.querySelector('#crop-panel')!.append(cropOverlay.element);
+
 // --- color mixer -----------------------------------------------------------------
 
 const colorMixerPanel = new ColorMixerPanel(editState.colorMix, render);
 document.querySelector('#color-mixer-panel')!.append(colorMixerPanel.element);
+
+// --- color grading ---------------------------------------------------------------
+
+const colorGradePanel = new ColorGradePanel(editState.colorGrade, render);
+document.querySelector('#color-grade-panel')!.append(colorGradePanel.element);
 
 // --- presets -----------------------------------------------------------------------
 // Applying a preset mutates editState in place, then we sync every control's
@@ -140,6 +245,8 @@ const presetPanel = new PresetPanel(new PresetStore(), {
     applyPresetSettings(editState, preset.settings);
     for (const [key, slider] of developSliders) slider.setValue(editState[key]);
     colorMixerPanel.syncFromState();
+    colorGradePanel.syncFromState();
+    curveEditor.setPoints(editState.curvePoints);
     render();
   },
 });
@@ -147,10 +254,12 @@ document.querySelector('#preset-panel')!.append(presetPanel.element);
 
 // --- tone curve ----------------------------------------------------------------
 
-const curveEditor = new CurveEditor((lut) => {
+const curveEditor = new CurveEditor((lut, points) => {
+  editState.curvePoints = points;
   renderer.setCurveLut(lut);
   render();
 });
+curveEditor.setPoints(editState.curvePoints);
 document.querySelector('#curve-panel')!.append(curveEditor.element);
 
 // --- debug toggles ---------------------------------------------------------------
@@ -165,12 +274,21 @@ const debugConfigs: Array<{ key: DebugKey; label: string }> = [
 
 document.querySelector('#debug-panel')!.append(
   ...debugConfigs.map(({ key, label }) =>
-    makeToggle(label, (enabled) => {
-      editState[key] = enabled;
-      render();
-    }),
+    makeToggle(
+      label,
+      (enabled) => {
+        editState[key] = enabled;
+        render();
+      },
+      editState[key],
+    ),
   ),
 );
+
+// --- export frame (Instagram formats + border) ------------------------------------
+
+const exportPanel = new ExportPanel();
+document.querySelector('#export-frame-panel')!.append(exportPanel.element);
 
 // --- export -----------------------------------------------------------------------
 
@@ -183,11 +301,11 @@ for (const { id, mime, quality, ext } of exportButtons) {
   document.querySelector<HTMLButtonElement>(id)!.addEventListener('click', async () => {
     statusLine.textContent = 'Exporting…';
     try {
-      const blob = await renderer.exportBlob(editState, mime, quality);
+      const blob = await renderer.exportBlob(editState, mime, quality, exportPanel.getSettings());
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `raw-lite-export.${ext}`;
+      link.download = `portraw-export.${ext}`;
       link.click();
       URL.revokeObjectURL(url);
       statusLine.textContent = 'Exported';
@@ -196,6 +314,38 @@ for (const { id, mime, quality, ext } of exportButtons) {
     }
   });
 }
+
+// --- tool rail tabs ------------------------------------------------------------
+
+const toolRailButtons = document.querySelectorAll<HTMLButtonElement>('.tool-rail-button');
+const tabPanels = document.querySelectorAll<HTMLElement>('.tab-panel');
+
+function selectTab(tab: string): void {
+  activeTab = tab;
+  for (const button of toolRailButtons) {
+    const selected = button.dataset.tab === tab;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  }
+  for (const panel of tabPanels) {
+    panel.classList.toggle('active', panel.dataset.tab === tab);
+  }
+  if (tab === 'crop') {
+    if (renderer.hasImage) cropOverlay.startArranging();
+  } else {
+    cropOverlay.finishArranging();
+  }
+  if (tab === 'export') {
+    exportPanel.refreshLayout();
+    refreshExportPreview();
+  }
+}
+
+for (const button of toolRailButtons) {
+  button.addEventListener('click', () => selectTab(button.dataset.tab!));
+}
+
+selectTab('edit');
 
 function setExportEnabled(enabled: boolean): void {
   for (const { id } of exportButtons) {
@@ -206,7 +356,10 @@ setExportEnabled(false);
 
 // --- keep the canvas buffer matched to its on-screen size -------------------------
 
-new ResizeObserver(() => render()).observe(canvas);
+new ResizeObserver(() => {
+  render();
+  cropOverlay.refreshLayout();
+}).observe(canvas);
 
 // --- dev-only: load a RAW from a URL via ?load=… (testing convenience) -------------
 

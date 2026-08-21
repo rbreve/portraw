@@ -1,7 +1,8 @@
 // Folder browser: pick a directory via the File System Access API and list
 // its DNG files so you can click through a shoot without re-opening a file
-// picker for each one. Chromium-only (Safari/Firefox don't implement
-// showDirectoryPicker) — the button disables itself when unsupported.
+// picker for each one. Supported in Chrome/Edge; not in Safari/Firefox
+// (unimplemented) or Brave (deliberately disabled for privacy) — the button
+// disables itself when unsupported.
 
 export class FolderPanel {
   readonly element: HTMLElement;
@@ -25,7 +26,8 @@ export class FolderPanel {
 
     if (!window.showDirectoryPicker) {
       openButton.disabled = true;
-      openButton.title = 'Folder browsing needs a Chromium-based browser (Chrome, Edge, Arc)';
+      openButton.title =
+        'This browser doesn’t support folder access (works in Chrome or Edge; Brave disables it for privacy)';
     }
   }
 
@@ -34,9 +36,16 @@ export class FolderPanel {
 
     let dirHandle: FileSystemDirectoryHandle;
     try {
-      dirHandle = await window.showDirectoryPicker({ id: 'raw-lite-folder' });
-    } catch {
-      return; // user dismissed the picker
+      dirHandle = await window.showDirectoryPicker({ id: 'portraw-folder' });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return; // user dismissed the picker
+      console.error('showDirectoryPicker failed:', error);
+      this.listEl.replaceChildren();
+      const message = document.createElement('p');
+      message.className = 'folder-empty';
+      message.textContent = `Couldn't open folder: ${error instanceof Error ? error.message : String(error)}`;
+      this.listEl.append(message);
+      return;
     }
 
     const entries: Array<{ name: string; handle: FileSystemFileHandle }> = [];

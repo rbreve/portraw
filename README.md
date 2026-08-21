@@ -1,4 +1,4 @@
-# raw lite
+# portraw
 
 A lightweight web-based RAW (DNG) photo editor — "lite Lightroom" — in vanilla
 TypeScript with no UI framework.
@@ -19,7 +19,7 @@ Two stages, strictly separated:
 
 Pipeline order inside the shader: white balance → exposure →
 highlights/shadows → sRGB OETF → tone curve LUT → color mixer →
-saturation → output.
+saturation → color grading → output.
 
 ## Files
 
@@ -31,6 +31,8 @@ saturation → output.
 | `src/decode.worker.ts`  | one-time LibRaw decode → linear RGBA16F           |
 | `src/controls.ts`       | slider/toggle DOM factories                       |
 | `src/colorMixer.ts`     | color mixer panel (band × tone zone HSL)          |
+| `src/colorGrade.ts`     | color grading panel (3-way wheels + luminance)    |
+| `src/config.ts`         | tuning knobs for the color grading engine         |
 | `src/preset.ts`         | preset model + localStorage store                 |
 | `src/presetPanel.ts`    | presets panel (save by name, icon grid, apply)    |
 | `src/curve.ts`          | SVG curve editor → 256-entry monotone-cubic LUT   |
@@ -55,8 +57,12 @@ Drop a `.dng` onto the window (or *Open RAW…*). Adjust exposure, highlights,
 shadows, temperature, tint, saturation and the tone curve — all at 60 fps.
 The color mixer targets one of five hue bands (red, orange, yellow, green,
 blue) split into darks / mids / lights, with hue, saturation and luminance
-per cell. *Save preset* snapshots the current develop settings (sliders +
-color mixer) under a name; its icon shows the name's first three letters on a
+per cell. Color grading offers a hue/saturation wheel plus a luminance slider
+for each of shadows, midtones and highlights — applied after global
+saturation, so a desaturated image can still be split-toned; its strength and
+zone-mask parameters are tunable in `src/config.ts`. *Save preset* snapshots
+the current develop settings (sliders + color mixer + color grading) under a
+name; its icon shows the name's first three letters on a
 random color. Presets persist in `localStorage`; click one to apply, hover to
 delete.
 Debug toggles can bypass the curve, show the linear buffer, and overlay

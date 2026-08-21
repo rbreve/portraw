@@ -18,7 +18,9 @@
 //   5. Tone curve LUT     (display — curves are drawn in display space)
 //   6. Color mixer        (display — per-band HSL, split by tone zone)
 //   7. Saturation         (display — luma/chroma split)
-//   8. Out (+ debug overlays)
+//   8. Color grading      (display — 3-way tint wheels; after saturation so
+//                          a desaturated image can still be split-toned)
+//   9. Out (+ debug overlays)
 // ============================================================================
 precision highp float;
 
@@ -42,6 +44,18 @@ uniform float u_saturation;   //  0..2,  1 = unchanged
 // (dark, mid, light) — the same order as COLOR_BANDS / TONE_ZONES in state.ts,
 // flattened by gl.ts. Each entry is (hue, saturation, luminance), all -1..+1.
 uniform vec3 u_colorMix[24];
+
+// --- color grading -----------------------------------------------------------
+// 3-way grade, one wheel per tone zone. Indexed by zone (shadows, midtones,
+// highlights) — the same order as GRADE_ZONES in state.ts, flattened by gl.ts.
+// Each entry is (hue in degrees, saturation 0..1, luminance -1..+1).
+uniform vec3 u_colorGrade[3];
+// Tuning knobs, sourced from config.ts (see there for docs) rather than
+// hard-coded here so the grade can be tuned in one place.
+uniform float u_gradeTintStrength;  // chroma shift at full wheel saturation
+uniform float u_gradeLumStrength;   // headroom fraction at full luminance
+uniform vec2 u_gradeShadowFade;     // shadow weight fades 1 -> 0 across [x, y]
+uniform vec2 u_gradeHighlightFade;  // highlight weight fades 0 -> 1 across [x, y]
 
 // --- debug toggles -----------------------------------------------------------
 uniform bool u_bypassCurve;   // skip step 5 (isolate curve bugs)
@@ -118,7 +132,7 @@ float curve(float v) {
 }
 
 // ----------------------------------------------------------------------------
-// HSL <-> RGB, used only by the color mixer (display-referred values).
+// HSL <-> RGB, used by the color mixer and color grading (display-referred values).
 // h in degrees [0, 360), s and l in [0, 1].
 // ----------------------------------------------------------------------------
 vec3 rgbToHsl(vec3 c) {
@@ -181,6 +195,36 @@ vec3 applyColorMix(vec3 c) {
     float lumShift = clamp(adjust.z, -1.0, 1.0) * MIX_LUM_RANGE;
     hsl.z = clamp(hsl.z + lumShift * (lumShift > 0.0 ? 1.0 - hsl.z : hsl.z), 0.0, 1.0);
     return hslToRgb(hsl);
+}
+
+// ----------------------------------------------------------------------------
+// 8. Color grading: blend each pixel across shadow/midtone/highlight zones by
+// display luma, then per zone apply the wheel's luminance shift and push the
+// chroma toward the wheel's hue along a zero-luma axis — the tint colors the
+// zone without changing its brightness, and a fully desaturated image still
+// takes the tint (the classic split-tone workflow).
+// ----------------------------------------------------------------------------
+vec3 applyColorGrade(vec3 c) {
+    float luma = dot(c, LUMA);
+    float highlightWeight = smoothstep(u_gradeHighlightFade.x, u_gradeHighlightFade.y, luma);
+    float shadowWeight = 1.0 - smoothstep(u_gradeShadowFade.x, u_gradeShadowFade.y, luma);
+    // max() keeps mids at zero (instead of negative) if the fades are tuned to overlap.
+    float midWeight = max(1.0 - shadowWeight - highlightWeight, 0.0);
+    float zoneWeight[3] = float[](shadowWeight, midWeight, highlightWeight);
+
+    for (int zone = 0; zone < 3; zone++) {
+        vec3 grade = u_colorGrade[zone]; // (hue deg, sat, lum)
+        float w = zoneWeight[zone];
+        // Luminance moves toward 1 (or 0) by a fraction of the remaining room,
+        // per channel — it can lift true blacks and never clips.
+        float shift = grade.z * u_gradeLumStrength * w;
+        c += shift * (shift > 0.0 ? vec3(1.0) - c : c);
+        if (grade.y > 0.0) {
+            vec3 tint = hslToRgb(vec3(grade.x, 1.0, 0.5));
+            c += (tint - dot(tint, LUMA)) * (grade.y * u_gradeTintStrength * w);
+        }
+    }
+    return clamp(c, 0.0, 1.0);
 }
 
 void main() {
@@ -262,6 +306,10 @@ void main() {
     }
 
     // ------------------------------------------------------------------ 8 ---
+    // COLOR GRADING — shadows/midtones/highlights wheels + per-zone luminance.
+    c = applyColorGrade(c);
+
+    // ------------------------------------------------------------------ 9 ---
     c = clamp(c, 0.0, 1.0);
 
     // DEBUG: clipping overlay — red where any channel is blown, blue where
