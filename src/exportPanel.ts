@@ -4,7 +4,7 @@
 // inside without Instagram's feed auto-crop clipping it. This module only
 // owns the settings UI + a live preview swatch; the actual pixel compositing
 // happens in GlRenderer.exportBlob.
-import { makeBoundSlider, makeToggle } from './controls';
+import { makeBoundSlider } from './controls';
 import { FRAME_SIZES, type ExportFormat } from './gl';
 
 export interface ExportFrameSettings {
@@ -33,10 +33,8 @@ export class ExportPanel {
   private readonly formatButtons = new Map<ExportFormat, HTMLButtonElement>();
   private readonly previewBox: HTMLElement;
   private readonly previewPhoto: HTMLElement;
-  private readonly borderSliderInput: HTMLInputElement;
 
   private format: ExportFormat = 'original';
-  private borderEnabled = false;
   private borderPercent = 6;
   private photoAspect = 1;
 
@@ -59,15 +57,9 @@ export class ExportPanel {
     this.previewBox.className = 'export-preview hidden';
     this.previewBox.append(this.previewPhoto);
 
-    const borderToggleRow = makeToggle('Add border', (enabled) => {
-      this.borderEnabled = enabled;
-      this.updateBorderControls();
-      this.updatePreview();
-    });
-
     const borderSlider = makeBoundSlider({
       label: 'Border size',
-      min: 2,
+      min: 0,
       max: 20,
       step: 1,
       value: this.borderPercent,
@@ -76,20 +68,18 @@ export class ExportPanel {
         this.updatePreview();
       },
     });
-    this.borderSliderInput = borderSlider.element.querySelector('input')!;
 
     this.element = document.createElement('div');
     this.element.className = 'export-frame';
-    this.element.append(formatGrid, this.previewBox, borderToggleRow, borderSlider.element);
+    this.element.append(formatGrid, this.previewBox, borderSlider.element);
 
     this.setFormat('original');
-    this.updateBorderControls();
   }
 
   getSettings(): ExportFrameSettings {
     return {
       format: this.format,
-      borderPercent: this.borderEnabled ? this.borderPercent : 0,
+      borderPercent: this.borderPercent,
       borderColor: BORDER_COLOR,
     };
   }
@@ -123,16 +113,11 @@ export class ExportPanel {
     for (const [key, button] of this.formatButtons) {
       button.classList.toggle('selected', key === format);
     }
-    this.updateBorderControls();
     this.updatePreview();
   }
 
-  private updateBorderControls(): void {
-    this.borderSliderInput.disabled = !this.borderEnabled;
-  }
-
   private updatePreview(): void {
-    const showsNothing = this.format === 'original' && !this.borderEnabled;
+    const showsNothing = this.format === 'original' && this.borderPercent <= 0;
     this.previewBox.classList.toggle('hidden', showsNothing);
     if (showsNothing) return;
 
@@ -164,7 +149,7 @@ export class ExportPanel {
     this.previewBox.style.width = `${canvasW}px`;
     this.previewBox.style.height = `${canvasH}px`;
 
-    const borderPx = this.borderEnabled ? (this.borderPercent / 100) * Math.min(canvasW, canvasH) : 0;
+    const borderPx = (this.borderPercent / 100) * Math.min(canvasW, canvasH);
     this.previewBox.style.padding = `${borderPx}px`;
 
     const innerW = Math.max(1, canvasW - borderPx * 2);

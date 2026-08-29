@@ -67,9 +67,13 @@ uniform bool u_showClipping;  // paint blown / crushed pixels
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 // Strength of a full slider deflection, in EV stops applied at mask peak.
+// HIGHLIGHT_STRENGTH is 2 stops so the slider can reach the recovered raw
+// headroom: the input texture is scene-referred with values above 1.0 where
+// the sensor captured more than the nominal white point (see decode.worker.ts)
+// — typically 1-1.5 stops, more under strongly coloured light.
 const float TEMP_STRENGTH      = 0.50;
 const float TINT_STRENGTH      = 0.35;
-const float HIGHLIGHT_STRENGTH = 1.00;
+const float HIGHLIGHT_STRENGTH = 2.00;
 const float SHADOW_STRENGTH    = 1.80;
 
 // Highlight mask shaping (all in sRGB-encoded luminance, 0..1):
@@ -228,6 +232,10 @@ vec3 applyColorGrade(vec3 c) {
 }
 
 void main() {
+    // Scene-referred linear RGB. May exceed 1.0: the decoder preserves the
+    // sensor's highlight headroom above the nominal white point, so negative
+    // exposure/highlights can pull REAL detail back into range. Values only
+    // clamp at the display encode (step 4) — never before.
     vec3 c = texture(u_image, v_uv).rgb;
 
     // ------------------------------------------------------------------ 1 ---
@@ -270,8 +278,10 @@ void main() {
     }
 
     // DEBUG: inspect the working linear buffer before display encoding.
-    // Clipping is judged here in LINEAR terms: blown = lost sensor data that
-    // steps 4-6 cannot bring back.
+    // Clipping is judged here in LINEAR terms, after exposure/highlights: a
+    // pixel still >= 1.0 at this point will display as blown — but thanks to
+    // the decoder's preserved headroom, pulling those sliders down can
+    // genuinely un-blow it (the overlay retreats as real detail returns).
     if (u_showLinear) {
         vec3 lin = clamp(c, 0.0, 1.0);
         if (u_showClipping) {
