@@ -14,6 +14,7 @@ import { editCacheKey, loadEditCache, saveEditCache } from './editCache';
 import {
   applyPresetSettings,
   applySidecarSettings,
+  captureSidecarSettings,
   createDefaultEditState,
   loadSessionEditState,
   persistSessionEditState,
@@ -331,13 +332,57 @@ document.querySelector('#debug-panel')!.append(
 // defaults — mirrors what applying a preset would touch, so crop and debug
 // toggles (outside that set) are left alone.
 
-document.querySelector<HTMLButtonElement>('#reset-edits')!.addEventListener('click', () => {
+function resetEdits(): void {
   resetDevelopSettings(editState);
   for (const [key, slider] of developSliders) slider.setValue(editState[key]);
   colorMixerPanel.syncFromState();
   colorGradePanel.syncFromState();
   curveEditor.setPoints(editState.curvePoints);
   render();
+}
+
+document.querySelector<HTMLButtonElement>('#reset-edits')!.addEventListener('click', resetEdits);
+document.querySelector<HTMLButtonElement>('#reset-edits-rail')!.addEventListener('click', resetEdits);
+
+// --- copy settings ---------------------------------------------------------------
+// Puts the current photo's develop settings + crop/flip on the OS clipboard as
+// JSON, e.g. to paste into a text file or share — same shape as a sidecar.
+
+document.querySelector<HTMLButtonElement>('#copy-settings')!.addEventListener('click', () => {
+  void (async () => {
+    try {
+      const json = JSON.stringify(captureSidecarSettings(editState), null, 2);
+      await navigator.clipboard.writeText(json);
+      statusLine.textContent = 'Settings copied';
+    } catch (error) {
+      statusLine.textContent = `Copy failed: ${error instanceof Error ? error.message : error}`;
+    }
+  })();
+});
+
+// --- paste settings ---------------------------------------------------------------
+// The inverse of copy: reads JSON off the OS clipboard and applies it to the
+// live photo, same mutate-then-sync-controls pattern as applying a preset.
+
+document.querySelector<HTMLButtonElement>('#paste-settings')!.addEventListener('click', () => {
+  void (async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const settings = JSON.parse(text) as SidecarSettings;
+      cropOverlay.finishArranging();
+      applySidecarSettings(editState, settings);
+      cropOverlay.syncFlipButtons();
+      for (const [key, slider] of developSliders) slider.setValue(editState[key]);
+      colorMixerPanel.syncFromState();
+      colorGradePanel.syncFromState();
+      curveEditor.setPoints(editState.curvePoints);
+      render();
+      refreshExportPreview();
+      statusLine.textContent = 'Settings pasted';
+    } catch (error) {
+      statusLine.textContent = `Paste failed: ${error instanceof Error ? error.message : error}`;
+    }
+  })();
 });
 
 // --- export frame (Instagram formats + border) ------------------------------------
@@ -372,7 +417,9 @@ for (const { id, mime, quality, ext } of exportButtons) {
 
 // --- tool rail tabs ------------------------------------------------------------
 
-const toolRailButtons = document.querySelectorAll<HTMLButtonElement>('.tool-rail-button');
+// Scoped to [data-tab] so the copy-settings/reset-edits action buttons further
+// down the rail (no associated tab-panel) aren't swept into tab-switching.
+const toolRailButtons = document.querySelectorAll<HTMLButtonElement>('.tool-rail-button[data-tab]');
 const tabPanels = document.querySelectorAll<HTMLElement>('.tab-panel');
 
 function selectTab(tab: string): void {
