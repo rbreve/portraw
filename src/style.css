@@ -82,6 +82,16 @@ body {
   color: var(--text);
 }
 
+.icon-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.icon-button:disabled:hover {
+  background: none;
+  color: var(--text-dim);
+}
+
 #folder-panel {
   flex: 1;
   display: flex;
@@ -183,6 +193,15 @@ body {
   display: flex;
 }
 
+.edit-toolbar-footer {
+  padding-top: 14px;
+  border-top: 1px solid var(--panel-edge);
+}
+
+.edit-toolbar-footer button {
+  width: 100%;
+}
+
 /* --- tool rail (far right) -------------------------------------------------- */
 
 #tool-rail {
@@ -252,8 +271,54 @@ body {
   min-height: 0;
 }
 
-.folder-panel > button {
+.folder-panel-toolbar {
+  display: flex;
   flex-shrink: 0;
+  gap: 6px;
+}
+
+.folder-open-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.folder-view-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.folder-view-toggle {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+}
+
+.folder-view-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-dim);
+}
+
+.folder-view-button:hover {
+  color: var(--text);
+}
+
+.folder-view-button.selected {
+  background: var(--accent);
+  color: #fff;
 }
 
 .folder-list {
@@ -272,10 +337,12 @@ body {
 }
 
 .folder-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   flex-shrink: 0;
-  padding: 7px 10px;
+  padding: 6px 10px;
   text-align: left;
   background: none;
   border: none;
@@ -283,9 +350,6 @@ body {
   color: var(--text);
   font: inherit;
   font-size: 12.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .folder-item:hover {
@@ -297,11 +361,298 @@ body {
   color: #fff;
 }
 
+.folder-thumb {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background-color: var(--panel-edge);
+  background-size: cover;
+  background-position: center;
+}
+
+.folder-thumb.loaded {
+  background-color: transparent;
+}
+
+.folder-item-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-list.grid-mode {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  align-content: start;
+  gap: 8px;
+  padding: 8px;
+}
+
+.folder-list.grid-mode .folder-item {
+  flex-direction: column;
+  align-items: stretch;
+  width: auto;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.folder-list.grid-mode .folder-thumb {
+  width: 100%;
+  height: 72px;
+}
+
+.folder-list.grid-mode .folder-item-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-size: 10.5px;
+  line-height: 1.2;
+}
+
 .folder-empty {
   margin: 0;
   padding: 6px 10px;
   color: var(--text-dim);
   font-size: 12px;
+}
+
+/* --- gallery overlay --------------------------------------------------------- */
+
+.gallery-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 10, 11, 0.97);
+  color: var(--text);
+}
+
+.gallery-overlay.hidden {
+  display: none;
+}
+
+.gallery-toolbar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--panel-edge);
+}
+
+.gallery-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.gallery-mode-toggle {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 8px;
+}
+
+.gallery-mode-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-dim);
+}
+
+.gallery-mode-button:hover {
+  color: var(--text);
+}
+
+.gallery-mode-button.selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.gallery-open-button {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.gallery-open-button:hover {
+  filter: brightness(1.08);
+}
+
+.gallery-close {
+  flex-shrink: 0;
+}
+
+.gallery-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.gallery-body[data-mode='grid'] .gallery-slideshow {
+  display: none;
+}
+
+.gallery-body[data-mode='slideshow'] .gallery-grid {
+  display: none;
+}
+
+/* grid mode */
+
+.gallery-grid {
+  height: 100%;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  align-content: start;
+}
+
+.gallery-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.gallery-grid-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  background-color: var(--panel);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--panel-edge);
+  transition: border-color 0.1s, transform 0.1s;
+}
+
+.gallery-grid-thumb.loaded {
+  background-color: transparent;
+}
+
+.gallery-grid-item:hover .gallery-grid-thumb {
+  border-color: var(--accent);
+}
+
+.gallery-grid-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* slideshow mode */
+
+.gallery-slideshow {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.gallery-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+}
+
+.gallery-stage-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.gallery-nav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-edge);
+  border-radius: 50%;
+  color: var(--text);
+}
+
+.gallery-nav:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.gallery-nav:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.gallery-filmstrip {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  border-top: 1px solid var(--panel-edge);
+}
+
+.gallery-filmstrip-item {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border-radius: 6px;
+  background-color: var(--panel);
+  background-size: cover;
+  background-position: center;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.gallery-filmstrip-item.loaded {
+  background-color: transparent;
+}
+
+.gallery-filmstrip-item:hover {
+  border-color: var(--panel-edge);
+}
+
+.gallery-filmstrip-item.selected {
+  border-color: var(--accent);
 }
 
 /* --- sliders --------------------------------------------------------------- */
@@ -647,6 +998,31 @@ input[type='range'] {
   gap: 8px;
 }
 
+/* Rows below the mode segmented control share its full-width, evenly-split layout. */
+.crop-actions button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12.5px;
+}
+
+.crop-actions button.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.icon-label-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.icon-label-button svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
 .crop-hint {
   margin: 0;
   color: var(--text-dim);
@@ -790,6 +1166,29 @@ button:hover {
 button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* Only show a focus ring for keyboard navigation, not after a mouse click —
+   otherwise the last-clicked button (e.g. a toggle) looks stuck mid-interaction. */
+button:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The primary action in a group of buttons (e.g. "Apply crop") — filled to
+   stand out from neutral secondary actions like "Reset crop". */
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover {
+  filter: brightness(1.1);
 }
 
 #export-panel {

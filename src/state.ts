@@ -128,6 +128,9 @@ export interface EditState {
   curvePoints: CurvePoint[];
   // null = full, uncropped image.
   crop: CropRect | null;
+  // Mirror the image horizontally/vertically — per-photo geometry, like crop.
+  flipHorizontal: boolean;
+  flipVertical: boolean;
   // Debug toggles
   bypassCurve: boolean;
   showLinear: boolean;
@@ -146,6 +149,8 @@ export function createDefaultEditState(): EditState {
     colorGrade: createDefaultColorGradeState(),
     curvePoints: createDefaultCurvePoints(),
     crop: null,
+    flipHorizontal: false,
+    flipVertical: false,
     bypassCurve: false,
     showLinear: false,
     showClipping: false,
@@ -153,11 +158,12 @@ export function createDefaultEditState(): EditState {
 }
 
 /**
- * Reset every field back to defaults for a newly opened photo. Mutates colorMix
- * cells in place (like applyPresetSettings) rather than replacing the object,
- * so existing references — e.g. the color mixer panel — stay valid.
+ * Reset the develop settings (the same fields a preset can set — see
+ * PresetSettings below) back to defaults. Mutates colorMix/colorGrade cells in
+ * place rather than replacing the objects, so existing references — e.g. the
+ * color mixer panel — stay valid.
  */
-export function resetEditState(state: EditState): void {
+export function resetDevelopSettings(state: EditState): void {
   state.exposureEv = 0;
   state.highlights = 0;
   state.shadows = 0;
@@ -173,17 +179,27 @@ export function resetEditState(state: EditState): void {
     Object.assign(state.colorGrade[zone], { hue: 0, saturation: 0, luminance: 0 });
   }
   state.curvePoints = createDefaultCurvePoints();
+}
+
+/** Reset every field back to defaults for a newly opened photo. */
+export function resetEditState(state: EditState): void {
+  resetDevelopSettings(state);
   state.crop = null;
+  state.flipHorizontal = false;
+  state.flipVertical = false;
   state.bypassCurve = false;
   state.showLinear = false;
   state.showClipping = false;
 }
 
 // --- presets -------------------------------------------------------------------
-// A preset stores the develop settings only; crop is per-photo geometry and
-// debug toggles are session state, so both are deliberately excluded — applying
-// a preset never reframes the image or flips a debug switch.
-export type PresetSettings = Omit<EditState, 'bypassCurve' | 'showLinear' | 'showClipping' | 'crop'>;
+// A preset stores the develop settings only; crop/flip are per-photo geometry
+// and debug toggles are session state, so all are deliberately excluded —
+// applying a preset never reframes the image or flips a debug switch.
+export type PresetSettings = Omit<
+  EditState,
+  'bypassCurve' | 'showLinear' | 'showClipping' | 'crop' | 'flipHorizontal' | 'flipVertical'
+>;
 
 /** Snapshot the develop settings of a live state into a standalone preset. */
 export function capturePresetSettings(state: EditState): PresetSettings {
@@ -222,6 +238,32 @@ export function applyPresetSettings(state: EditState, settings: PresetSettings):
     Object.assign(state.colorGrade[zone], settings.colorGrade?.[zone] ?? { hue: 0, saturation: 0, luminance: 0 });
   }
   state.curvePoints = cloneCurvePoints(settings.curvePoints);
+  return state;
+}
+
+// --- per-photo sidecar edits -----------------------------------------------------
+// Everything a sidecar file persists for one photo: develop settings plus the
+// crop/flip geometry (per-photo, unlike a preset). Debug toggles are session-only
+// view aids, not photo edits, so they're excluded — same exclusion list as
+// PresetSettings, minus crop/flip which sidecars DO carry.
+export type SidecarSettings = Omit<EditState, 'bypassCurve' | 'showLinear' | 'showClipping'>;
+
+/** Snapshot a live state's edits (develop settings + crop/flip) for writing to a sidecar file. */
+export function captureSidecarSettings(state: EditState): SidecarSettings {
+  return {
+    ...capturePresetSettings(state),
+    crop: state.crop ? { ...state.crop } : null,
+    flipHorizontal: state.flipHorizontal,
+    flipVertical: state.flipVertical,
+  };
+}
+
+/** Copy a loaded sidecar's settings back into live state, same mutate-in-place pattern as applyPresetSettings. */
+export function applySidecarSettings(state: EditState, settings: SidecarSettings): EditState {
+  applyPresetSettings(state, settings);
+  state.crop = settings.crop ? { ...settings.crop } : null;
+  state.flipHorizontal = settings.flipHorizontal;
+  state.flipVertical = settings.flipVertical;
   return state;
 }
 

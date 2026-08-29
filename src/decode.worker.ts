@@ -26,14 +26,23 @@
 import LibRaw from 'libraw-wasm';
 
 export interface DecodeRequest {
+  /**
+   * Echoed back on every response so the caller can drop stale results. The
+   * worker's onmessage is async (awaits WASM decode calls), so if a second
+   * file is posted before the first one's two decode passes finish, the
+   * event loop interleaves them — without an id, responses for two different
+   * files can arrive mixed together with no way to tell them apart.
+   */
+  requestId: number;
   /** Raw file bytes. Transferred into the worker. */
   fileBuffer: ArrayBuffer;
 }
 
 export type DecodeResponse =
-  | { type: 'status'; message: string }
+  | { type: 'status'; requestId: number; message: string }
   | {
       type: 'image';
+      requestId: number;
       /** 'preview' = fast half-size decode, 'full' = final full-res decode. */
       stage: 'preview' | 'full';
       width: number;
@@ -43,7 +52,7 @@ export type DecodeResponse =
       /** 256-bin histogram of display-referred (sRGB-encoded) luminance. */
       histogram: Uint32Array;
     }
-  | { type: 'error'; message: string };
+  | { type: 'error'; requestId: number; message: string };
 
 const workerScope = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -135,7 +144,7 @@ function convertPixels(
 // ---------------------------------------------------------------------------
 
 async function decodeOnce(
-  bytes: Uint8Array,
+  bytes: Uint8Array<ArrayBuffer>,
   halfSize: boolean,
 ): Promise<{ width: number; height: number; pixels: Uint16Array; histogram: Uint32Array }> {
   const raw = new LibRaw();
@@ -150,6 +159,7 @@ async function decodeOnce(
       halfSize,
     });
     const image = await raw.imageData();
+    if (!image) throw new Error('no image data');
     if (image.bits !== 16 || !(image.data instanceof Uint16Array)) {
       throw new Error(`expected 16-bit output, got ${image.bits}-bit`);
     }
@@ -161,11 +171,12 @@ async function decodeOnce(
   } finally {
     // Each LibRaw instance owns an internal worker holding a large wasm heap;
     // release it as soon as the decode is done.
-    raw.worker.terminate();
+    raw.dispose();
   }
 }
 
 workerScope.onmessage = async ({ data }: MessageEvent<DecodeRequest>) => {
+  const { requestId } = data;
   const post = (msg: DecodeResponse, transfer: Transferable[] = []) =>
     workerScope.postMessage(msg, transfer);
 
@@ -175,18 +186,18 @@ workerScope.onmessage = async ({ data }: MessageEvent<DecodeRequest>) => {
     // Pass 1 — half-size decode for a near-instant preview.
     // LibRaw.open() transfers (detaches) the buffer it is given, so each pass
     // gets its own copy of the file bytes.
-    post({ type: 'status', message: 'Decoding preview…' });
+    post({ type: 'status', requestId, message: 'Decoding preview…' });
     const preview = await decodeOnce(fileBytes.slice(), true);
-    post({ type: 'image', stage: 'preview', ...preview }, [
+    post({ type: 'image', requestId, stage: 'preview', ...preview }, [
       preview.pixels.buffer,
       preview.histogram.buffer,
     ]);
 
     // Pass 2 — the one true full-resolution decode.
-    post({ type: 'status', message: 'Decoding full resolution…' });
+    post({ type: 'status', requestId, message: 'Decoding full resolution…' });
     const full = await decodeOnce(fileBytes, false);
-    post({ type: 'image', stage: 'full', ...full }, [full.pixels.buffer, full.histogram.buffer]);
+    post({ type: 'image', requestId, stage: 'full', ...full }, [full.pixels.buffer, full.histogram.buffer]);
   } catch (error) {
-    post({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+    post({ type: 'error', requestId, message: error instanceof Error ? error.message : String(error) });
   }
 };

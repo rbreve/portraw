@@ -69,8 +69,8 @@ const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 // Strength of a full slider deflection, in EV stops applied at mask peak.
 const float TEMP_STRENGTH      = 0.50;
 const float TINT_STRENGTH      = 0.35;
-const float HIGHLIGHT_STRENGTH = 1.50;
-const float SHADOW_STRENGTH    = 2.00;
+const float HIGHLIGHT_STRENGTH = 1.00;
+const float SHADOW_STRENGTH    = 1.80;
 
 // Highlight mask shaping (all in sRGB-encoded luminance, 0..1):
 //   KNEE       — where the full-strength highlight zone begins. Raise to
@@ -79,9 +79,9 @@ const float SHADOW_STRENGTH    = 2.00;
 //                deeper into the midtones.
 //   MID_AMOUNT — fraction of full strength applied across the midtone tail
 //                (0 = highlights only, 1 = midtones get the full effect).
-const float HIGHLIGHT_KNEE       = 0.60;
-const float HIGHLIGHT_MID_REACH  = 0.25;
-const float HIGHLIGHT_MID_AMOUNT = 0.30;
+const float HIGHLIGHT_KNEE       = 0.68;
+const float HIGHLIGHT_MID_REACH  = 0.45;
+const float HIGHLIGHT_MID_AMOUNT = 0.15;
 
 // Color-mixer tuning — what one full slider deflection does:
 //   MIX_HUE_RANGE_DEG : max hue rotation in degrees

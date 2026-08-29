@@ -10,13 +10,17 @@ import { FolderPanel } from './folderPanel';
 import { PresetPanel } from './presetPanel';
 import { PresetStore } from './preset';
 import { CurveEditor } from './curve';
+import { editCacheKey, loadEditCache, saveEditCache } from './editCache';
 import {
   applyPresetSettings,
+  applySidecarSettings,
   createDefaultEditState,
   loadSessionEditState,
   persistSessionEditState,
+  resetDevelopSettings,
   resetEditState,
   type EditState,
+  type SidecarSettings,
 } from './state';
 import type { DecodeRequest, DecodeResponse } from './decode.worker';
 
@@ -29,14 +33,23 @@ const fileInput = document.querySelector<HTMLInputElement>('#file-input')!;
 const editState: EditState = loadSessionEditState() ?? createDefaultEditState();
 const renderer = new GlRenderer(canvas);
 
+// Cache key for the currently open photo's edits (see editCache.ts) — null
+// until the first photo is loaded.
+let currentEditCacheKey: string | null = null;
+
+function persistCurrentPhoto(): void {
+  persistSessionEditState(editState);
+  if (currentEditCacheKey) void saveEditCache(currentEditCacheKey, editState);
+}
+
 // Debounced so a slider drag (many render() calls/sec) doesn't hammer
-// localStorage — only the settled value after a short pause gets written.
+// localStorage/IndexedDB — only the settled value after a short pause gets written.
 let persistTimer: ReturnType<typeof setTimeout> | undefined;
 function schedulePersist(): void {
   clearTimeout(persistTimer);
-  persistTimer = setTimeout(() => persistSessionEditState(editState), 400);
+  persistTimer = setTimeout(persistCurrentPhoto, 400);
 }
-window.addEventListener('beforeunload', () => persistSessionEditState(editState));
+window.addEventListener('beforeunload', persistCurrentPhoto);
 
 const render = () => {
   renderer.render(editState);
@@ -76,8 +89,19 @@ const decodeWorker = new Worker(new URL('./decode.worker.ts', import.meta.url), 
 // defaults while the new file is still being read/decoded — a RAW preview with
 // every adjustment zeroed can look dark/flat, which read as "the image reset".
 let resetOnNextImage = false;
+// The incoming photo's cached edits (loaded in loadFile, before decode
+// starts), consumed by resetControlsForNewFile alongside resetOnNextImage.
+// Null means "nothing saved for this photo" — fall back to defaults.
+let pendingCachedEdits: SidecarSettings | null = null;
+
+// Bumped on every loadFile() call and echoed by the worker on every response
+// (see DecodeRequest.requestId) — lets us drop messages from a photo that got
+// superseded by a newer load before its two decode passes finished, instead
+// of momentarily rendering the wrong pixels/edits pairing.
+let latestRequestId = 0;
 
 decodeWorker.onmessage = ({ data }: MessageEvent<DecodeResponse>) => {
+  if (data.requestId !== latestRequestId) return; // superseded by a newer loadFile() call
   switch (data.type) {
     case 'status':
       statusLine.textContent = data.message;
@@ -110,23 +134,33 @@ decodeWorker.onmessage = ({ data }: MessageEvent<DecodeResponse>) => {
 /** Reset every develop/crop/debug control back to defaults for the incoming photo. */
 function resetControlsForNewFile(): void {
   cropOverlay.finishArranging(); // commit (harmlessly overwritten below) rather than leave arranging mid-drag
-  resetEditState(editState);
+  resetEditState(editState); // also clears debug toggles, which cached edits have no opinion on
+  if (pendingCachedEdits) applySidecarSettings(editState, pendingCachedEdits);
+  cropOverlay.syncFlipButtons();
   for (const [key, slider] of developSliders) slider.setValue(editState[key]);
   colorMixerPanel.syncFromState();
   colorGradePanel.syncFromState();
-  curveEditor.reset();
+  if (pendingCachedEdits) curveEditor.setPoints(editState.curvePoints);
+  else curveEditor.reset();
   for (const input of document.querySelectorAll<HTMLInputElement>('#debug-panel input[type=checkbox]')) {
     input.checked = false;
   }
 }
 
-async function loadFile(file: File): Promise<void> {
+async function loadFile(file: File, dirName = ''): Promise<void> {
+  const requestId = ++latestRequestId; // supersedes any in-flight decode immediately
+  const cacheKey = editCacheKey(dirName, file);
+  const cachedEdits = (await loadEditCache(cacheKey)) ?? null;
+  if (requestId !== latestRequestId) return; // another loadFile() started while we awaited the cache read
+  currentEditCacheKey = cacheKey;
+  pendingCachedEdits = cachedEdits;
   resetOnNextImage = true;
   dropOverlay.classList.add('hidden');
   statusLine.textContent = `Reading ${file.name}…`;
   setExportEnabled(false);
   const fileBuffer = await file.arrayBuffer();
-  const request: DecodeRequest = { fileBuffer };
+  if (requestId !== latestRequestId) return; // ditto, while we awaited reading the file bytes
+  const request: DecodeRequest = { requestId, fileBuffer };
   decodeWorker.postMessage(request, [fileBuffer]);
 }
 
@@ -139,7 +173,7 @@ fileInput.addEventListener('change', () => {
 
 // --- folder browser ----------------------------------------------------------
 
-const folderPanel = new FolderPanel((file) => void loadFile(file));
+const folderPanel = new FolderPanel((file, _name, dirName) => void loadFile(file, dirName));
 document.querySelector('#folder-panel')!.append(folderPanel.element);
 
 const fileBrowser = document.querySelector<HTMLElement>('#file-browser')!;
@@ -223,6 +257,13 @@ const cropOverlay = new CropOverlay(viewport, {
     renderer.setCropPreviewActive(arranging);
     render();
   },
+  getFlip: () => ({ horizontal: editState.flipHorizontal, vertical: editState.flipVertical }),
+  onToggleFlip: (axis) => {
+    if (axis === 'horizontal') editState.flipHorizontal = !editState.flipHorizontal;
+    else editState.flipVertical = !editState.flipVertical;
+    render();
+    refreshExportPreview();
+  },
 });
 document.querySelector('#crop-panel')!.append(cropOverlay.element);
 
@@ -284,6 +325,20 @@ document.querySelector('#debug-panel')!.append(
     ),
   ),
 );
+
+// --- reset edits ---------------------------------------------------------------
+// Clears develop sliders, color mixer, color grading, and the tone curve back to
+// defaults — mirrors what applying a preset would touch, so crop and debug
+// toggles (outside that set) are left alone.
+
+document.querySelector<HTMLButtonElement>('#reset-edits')!.addEventListener('click', () => {
+  resetDevelopSettings(editState);
+  for (const [key, slider] of developSliders) slider.setValue(editState[key]);
+  colorMixerPanel.syncFromState();
+  colorGradePanel.syncFromState();
+  curveEditor.setPoints(editState.curvePoints);
+  render();
+});
 
 // --- export frame (Instagram formats + border) ------------------------------------
 

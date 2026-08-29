@@ -21,10 +21,14 @@ const vertexSource = `#version 300 es
 layout(location = 0) in vec2 position;
 uniform vec2 u_cropOrigin; // top-left of the crop rect, in uv space
 uniform vec2 u_cropScale;  // crop rect size, in uv space
+uniform bool u_flipH;      // mirror the framed (post-crop) image horizontally
+uniform bool u_flipV;      // mirror the framed (post-crop) image vertically
 out vec2 v_uv;
 void main() {
   // Decoded rows arrive top-first; GL's v axis points up, so flip v here.
   vec2 uv = vec2(position.x * 0.5 + 0.5, 0.5 - position.y * 0.5);
+  if (u_flipH) uv.x = 1.0 - uv.x;
+  if (u_flipV) uv.y = 1.0 - uv.y;
   v_uv = u_cropOrigin + uv * u_cropScale;
   gl_Position = vec4(position, 0.0, 1.0);
 }`;
@@ -252,6 +256,8 @@ export class GlRenderer {
       u_curveLut: this.curveLutTexture,
       u_cropOrigin: crop ? [crop.x, crop.y] : [0, 0],
       u_cropScale: crop ? [crop.width, crop.height] : [1, 1],
+      u_flipH: state.flipHorizontal,
+      u_flipV: state.flipVertical,
       u_exposureEv: state.exposureEv,
       u_highlights: state.highlights / 100,
       u_shadows: state.shadows / 100,

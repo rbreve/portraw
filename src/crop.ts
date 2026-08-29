@@ -18,6 +18,11 @@ type DragMode = 'move' | Corner;
 const MIN_SIZE = 0.05;
 const CORNERS: Corner[] = ['nw', 'ne', 'sw', 'se'];
 
+// Mirror-axis icons: a center line with arrows pointing outward along the
+// axis being flipped (vertical line + horizontal arrows = flip horizontal).
+const FLIP_H_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M16 8l4 4-4 4"/><path d="M8 8L4 12l4 4"/></svg>`;
+const FLIP_V_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M8 16l4 4 4-4"/><path d="M8 8l4-4 4 4"/></svg>`;
+
 export interface CropOverlayCallbacks {
   /** The crop rect currently applied to the live image, if any. */
   getCrop: () => CropRect | null;
@@ -27,6 +32,10 @@ export interface CropOverlayCallbacks {
   onReset: () => void;
   /** Fires when arranging starts/stops — caller should show/hide the full image. */
   onModeChange: (arranging: boolean) => void;
+  /** The flip state currently applied to the live image. */
+  getFlip: () => { horizontal: boolean; vertical: boolean };
+  /** Toggle mirroring the image along the given axis. */
+  onToggleFlip: (axis: 'horizontal' | 'vertical') => void;
 }
 
 export class CropOverlay {
@@ -41,6 +50,8 @@ export class CropOverlay {
   private readonly maskLeft: HTMLElement;
   private readonly maskRight: HTMLElement;
   private readonly primaryButton: HTMLButtonElement;
+  private readonly flipHButton: HTMLButtonElement;
+  private readonly flipVButton: HTMLButtonElement;
   private readonly hint: HTMLElement;
   private readonly modeButtons = new Map<CropMode, HTMLButtonElement>();
 
@@ -90,12 +101,15 @@ export class CropOverlay {
     this.overlayEl.addEventListener('pointermove', (e) => this.onPointerMove(e));
     this.overlayEl.addEventListener('pointerup', (e) => this.onPointerUp(e));
     this.overlayEl.addEventListener('pointercancel', (e) => this.onPointerUp(e));
+    this.overlayEl.addEventListener('dblclick', () => {
+      if (this.arranging) this.commit();
+    });
     document.addEventListener('keydown', (e) => this.onKeyDown(e));
 
     // --- sidebar controls ---------------------------------------------------
     this.hint = document.createElement('p');
     this.hint.className = 'crop-hint';
-    this.hint.textContent = 'Drag the corners to frame the shot — Enter to crop, Esc to cancel.';
+    this.hint.textContent = 'Drag the corners to frame the shot — Enter or double-click to crop, Esc to cancel.';
 
     const modeRow = document.createElement('div');
     modeRow.className = 'segmented';
@@ -111,11 +125,31 @@ export class CropOverlay {
       modeRow.append(button);
     }
 
+    const flipRow = document.createElement('div');
+    flipRow.className = 'crop-actions';
+
+    this.flipHButton = document.createElement('button');
+    this.flipHButton.type = 'button';
+    this.flipHButton.className = 'icon-label-button';
+    this.flipHButton.innerHTML = `${FLIP_H_ICON}<span>Flip horizontal</span>`;
+    this.flipHButton.disabled = true;
+    this.flipHButton.addEventListener('click', () => this.toggleFlip('horizontal'));
+
+    this.flipVButton = document.createElement('button');
+    this.flipVButton.type = 'button';
+    this.flipVButton.className = 'icon-label-button';
+    this.flipVButton.innerHTML = `${FLIP_V_ICON}<span>Flip vertical</span>`;
+    this.flipVButton.disabled = true;
+    this.flipVButton.addEventListener('click', () => this.toggleFlip('vertical'));
+
+    flipRow.append(this.flipHButton, this.flipVButton);
+
     const actionsRow = document.createElement('div');
     actionsRow.className = 'crop-actions';
 
     this.primaryButton = document.createElement('button');
     this.primaryButton.type = 'button';
+    this.primaryButton.className = 'primary';
     this.primaryButton.textContent = 'Apply crop';
     this.primaryButton.disabled = true;
     this.primaryButton.addEventListener('click', () => this.commit());
@@ -129,9 +163,10 @@ export class CropOverlay {
 
     this.element = document.createElement('div');
     this.element.className = 'crop-panel';
-    this.element.append(modeRow, actionsRow, this.hint);
+    this.element.append(modeRow, flipRow, actionsRow, this.hint);
 
     this.updateModeButtons();
+    this.updateFlipButtons();
     this.updateHint();
   }
 
@@ -140,7 +175,14 @@ export class CropOverlay {
     this.imageWidth = width;
     this.imageHeight = height;
     this.primaryButton.disabled = false;
+    this.flipHButton.disabled = false;
+    this.flipVButton.disabled = false;
     this.refreshLayout();
+  }
+
+  /** Re-sync the flip button highlight with live state, e.g. after a new photo resets it. */
+  syncFlipButtons(): void {
+    this.updateFlipButtons();
   }
 
   /** Enter arranging mode, e.g. when the Crop tab is selected — a no-op if already arranging or no image is loaded. */
@@ -215,6 +257,17 @@ export class CropOverlay {
     for (const [mode, button] of this.modeButtons) {
       button.classList.toggle('selected', mode === this.mode);
     }
+  }
+
+  private toggleFlip(axis: 'horizontal' | 'vertical'): void {
+    this.callbacks.onToggleFlip(axis);
+    this.updateFlipButtons();
+  }
+
+  private updateFlipButtons(): void {
+    const flip = this.callbacks.getFlip();
+    this.flipHButton.classList.toggle('selected', flip.horizontal);
+    this.flipVButton.classList.toggle('selected', flip.vertical);
   }
 
   private updateHint(): void {
