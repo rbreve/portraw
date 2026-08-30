@@ -1063,6 +1063,22 @@ input[type='range']:not(.slider-input) {
   gap: 8px;
 }
 
+.curve-channels button[data-channel='red'] {
+  color: #ee7777;
+}
+
+.curve-channels button[data-channel='green'] {
+  color: #72ce87;
+}
+
+.curve-channels button[data-channel='blue'] {
+  color: #73a9f5;
+}
+
+.curve-channels button.selected {
+  color: #fff;
+}
+
 .curve-svg {
   width: 100%;
   aspect-ratio: 1;
@@ -1094,11 +1110,35 @@ input[type='range']:not(.slider-input) {
   stroke-width: 2;
 }
 
+.curve-editor[data-channel='red'] .curve-path {
+  stroke: #ef6262;
+}
+
+.curve-editor[data-channel='green'] .curve-path {
+  stroke: #57c875;
+}
+
+.curve-editor[data-channel='blue'] .curve-path {
+  stroke: #629cf0;
+}
+
 .curve-handle {
   fill: #fff;
   stroke: var(--accent);
   stroke-width: 2;
   cursor: grab;
+}
+
+.curve-editor[data-channel='red'] .curve-handle {
+  stroke: #ef6262;
+}
+
+.curve-editor[data-channel='green'] .curve-handle {
+  stroke: #57c875;
+}
+
+.curve-editor[data-channel='blue'] .curve-handle {
+  stroke: #629cf0;
 }
 
 /* --- crop -------------------------------------------------------------------- */

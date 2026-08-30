@@ -15,7 +15,7 @@
 //   2. Exposure           (linear — light is additive in linear)
 //   3. Highlights/Shadows (linear — tonal compression on scene light)
 //   4. sRGB OETF          (linear -> display-referred)
-//   5. Tone curve LUT     (display — curves are drawn in display space)
+//   5. Tone-curve LUTs    (display — curves are drawn in display space)
 //   6. Color mixer        (display — per-band HSL, split by tone zone)
 //   7. Saturation         (display — luma/chroma split)
 //   8. Color grading      (display — 3-way tint wheels; after saturation so
@@ -28,7 +28,7 @@ in vec2 v_uv;
 out vec4 outColor;
 
 uniform sampler2D u_image;    // linear RGBA16F source
-uniform sampler2D u_curveLut; // 256x1 R16F master tone curve
+uniform sampler2D u_curveLut; // 256x4 R16F: RGB master, red, green, blue
 
 // --- edit uniforms (normalized; mapping from slider units happens in gl.ts) -
 uniform float u_temperature;  // -1..+1, + = warmer (relative to camera WB)
@@ -127,12 +127,17 @@ vec3 linearToSrgb(vec3 c) {
 }
 
 // ----------------------------------------------------------------------------
-// 5. Tone curve: sample the 256-entry LUT per channel (master RGB curve).
+// 5. Tone curves: sample one row of the 256x4 LUT texture.
+// Rows are RGB master, red, green, blue, matching CURVE_CHANNELS in state.ts.
 // Texel centers live at (i + 0.5)/256, so map value v in [0,1] onto the
 // center span — sampling at v directly would clip the first/last half texel.
 // ----------------------------------------------------------------------------
-float curve(float v) {
-    return texture(u_curveLut, vec2((clamp(v, 0.0, 1.0) * 255.0 + 0.5) / 256.0, 0.5)).r;
+float curve(float v, int row) {
+    vec2 uv = vec2(
+        (clamp(v, 0.0, 1.0) * 255.0 + 0.5) / 256.0,
+        (float(row) + 0.5) / 4.0
+    );
+    return texture(u_curveLut, uv).r;
 }
 
 // ----------------------------------------------------------------------------
@@ -298,9 +303,10 @@ void main() {
     c = linearToSrgb(clamp(c, 0.0, 1.0));
 
     // ------------------------------------------------------------------ 5 ---
-    // TONE CURVE — master RGB curve from the SVG editor, as a 256-entry LUT.
+    // TONE CURVES — apply the RGB master first, then each channel's curve.
     if (!u_bypassCurve) {
-        c = vec3(curve(c.r), curve(c.g), curve(c.b));
+        c = vec3(curve(c.r, 0), curve(c.g, 0), curve(c.b, 0));
+        c = vec3(curve(c.r, 1), curve(c.g, 2), curve(c.b, 3));
     }
 
     // ------------------------------------------------------------------ 6 ---
