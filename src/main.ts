@@ -1,7 +1,12 @@
 // Bootstrap + wiring. The whole app is: one editState object, one renderer,
 // one render() closure. UI events mutate editState then call render().
 import { GlRenderer } from './gl';
-import { makeBoundSlider, makeToggle, type SliderHandle } from './controls';
+import {
+  makeBoundSlider,
+  makeToggle,
+  type SliderAppearance,
+  type SliderHandle,
+} from './controls';
 import { ColorGradePanel } from './colorGrade';
 import { ColorMixerPanel } from './colorMixer';
 import { CropOverlay } from './crop';
@@ -208,13 +213,36 @@ window.addEventListener('drop', (e) => {
 
 type NumericKey = 'exposureEv' | 'highlights' | 'shadows' | 'temperature' | 'tint' | 'saturation';
 
-const sliderConfigs: Array<{ key: NumericKey; label: string; min: number; max: number; step: number }> = [
-  { key: 'exposureEv', label: 'Exposure', min: -5, max: 5, step: 0.1 },
+interface DevelopSliderConfig {
+  key: NumericKey;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  appearance?: SliderAppearance;
+}
+
+const sliderConfigs: DevelopSliderConfig[] = [
+  { key: 'exposureEv', label: 'Exposure', min: -5, max: 5, step: 0.1, appearance: 'exposure' },
   { key: 'highlights', label: 'Highlights', min: -100, max: 100, step: 0.1 },
   { key: 'shadows', label: 'Shadows', min: -100, max: 100, step: 0.1 },
-  { key: 'temperature', label: 'Temperature', min: -100, max: 100, step: 0.1 },
-  { key: 'tint', label: 'Tint', min: -100, max: 100, step: 0.1 },
-  { key: 'saturation', label: 'Saturation', min: -100, max: 100, step: 0.1 },
+  {
+    key: 'temperature',
+    label: 'Temperature',
+    min: -100,
+    max: 100,
+    step: 0.1,
+    appearance: 'temperature',
+  },
+  { key: 'tint', label: 'Tint', min: -100, max: 100, step: 0.1, appearance: 'tint' },
+  {
+    key: 'saturation',
+    label: 'Saturation',
+    min: -100,
+    max: 100,
+    step: 0.1,
+    appearance: 'saturation',
+  },
 ];
 
 // Keep each slider's handle keyed by state field so applying a preset can push
@@ -228,6 +256,7 @@ document.querySelector('#sliders')!.append(
       max: config.max,
       step: config.step,
       value: editState[config.key],
+      appearance: config.appearance,
       onInput: (value) => {
         editState[config.key] = value;
         render();

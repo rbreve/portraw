@@ -7,8 +7,12 @@ export interface SliderSpec {
   max: number;
   step: number;
   value: number;
+  /** Optional semantic track treatment for adjustments with a visual range. */
+  appearance?: SliderAppearance;
   onInput: (value: number) => void;
 }
+
+export type SliderAppearance = 'exposure' | 'temperature' | 'tint' | 'saturation';
 
 export interface SliderHandle {
   element: HTMLElement;
@@ -33,10 +37,18 @@ export function makeBoundSlider(spec: SliderSpec): SliderHandle {
 
   const input = document.createElement('input');
   input.type = 'range';
+  input.className = 'slider-input';
   input.min = String(spec.min);
   input.max = String(spec.max);
   input.step = String(spec.step);
   input.value = String(spec.value);
+  input.setAttribute('aria-label', spec.label);
+  input.title = `${spec.label} — double-click to reset`;
+
+  const track = document.createElement('div');
+  track.className = 'slider-track';
+  if (spec.appearance) track.dataset.appearance = spec.appearance;
+  track.append(input);
 
   const decimals = spec.step % 1 === 0 ? 0 : String(spec.step).split('.')[1].length;
   const showValue = (value: number) => {
@@ -54,7 +66,7 @@ export function makeBoundSlider(spec: SliderSpec): SliderHandle {
     apply(spec.value);
   });
 
-  row.append(label, input, readout);
+  row.append(label, track, readout);
   return {
     element: row,
     setValue(value: number) {
