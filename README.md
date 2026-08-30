@@ -22,7 +22,7 @@ Two stages, strictly separated:
    changes never re-decode or touch pixels in JS.
 
 Pipeline order inside the shader: white balance → exposure →
-highlights/shadows → sRGB OETF → tone curve LUT → color mixer →
+highlights/shadows → sRGB OETF → tone-curve LUTs → color mixer →
 saturation → color grading → output.
 
 ## Files
@@ -39,7 +39,8 @@ saturation → color grading → output.
 | `src/config.ts`         | tuning knobs for the color grading engine         |
 | `src/preset.ts`         | preset model + localStorage store                 |
 | `src/presetPanel.ts`    | presets panel (save by name, icon grid, apply)    |
-| `src/curve.ts`          | SVG curve editor → 256-entry monotone-cubic LUT   |
+| `src/curve.ts`          | RGB/channel curve editor → monotone-cubic LUTs    |
+| `src/curveLut.ts`       | Pure tone-curve interpolation and LUT generation |
 | `src/crop.ts`           | interactive crop overlay (arrange, resize, lock)  |
 | `src/exportPanel.ts`    | Instagram-style export framing + border settings  |
 | `src/folderPanel.ts`    | folder browser (File System Access API)           |
@@ -69,8 +70,9 @@ npm run preview  # serve the production build
   hue + saturation tinting, plus a per-zone luminance slider. Applied after
   global saturation, so a fully desaturated image can still be split-toned.
   Strength and zone-mask tuning live in `src/config.ts`.
-- **Tone curve** — an SVG curve editor over the image's histogram, with
-  monotone-cubic interpolation baked to a 256-entry LUT.
+- **Tone curves** — RGB master plus independent red, green, and blue SVG
+  curves over the image histogram, with monotone-cubic interpolation baked to
+  a four-row LUT texture.
 - **Crop** — a draggable, resizable overlay over the full image, freeform or
   locked to the source's aspect ratio; the crop is normalized so it survives
   export at full resolution.
@@ -87,7 +89,7 @@ npm run preview  # serve the production build
   (1080×1080), horizontal (1080×566) or vertical (1080×1350) canvases at
   Instagram's own recommended pixel dimensions, with a live preview swatch
   before you export.
-- **Debug toggles** — bypass the tone curve, view the pre-gamma linear
+- **Debug toggles** — bypass the tone curves, view the pre-gamma linear
   buffer, or overlay blown/crushed pixels.
 
 ## Use

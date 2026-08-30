@@ -86,11 +86,16 @@ export function cloneColorGradeState(source: ColorGradeState): ColorGradeState {
 // --- tone curve ------------------------------------------------------------------
 // Control points in normalized [0,1]^2 space (x = input, y = output), the same
 // shape curve.ts's CurveEditor edits directly — kept here so presets/session
-// persistence can save and restore it like any other develop setting.
+// persistence can save and restore it like any other develop setting. Channel
+// order is also the contract with the rows of the LUT texture in gl.ts.
 export interface CurvePoint {
   x: number;
   y: number;
 }
+
+export const CURVE_CHANNELS = ['rgb', 'red', 'green', 'blue'] as const;
+export type CurveChannel = (typeof CURVE_CHANNELS)[number];
+export type ToneCurveState = Record<CurveChannel, CurvePoint[]>;
 
 export function createDefaultCurvePoints(): CurvePoint[] {
   return [
@@ -102,6 +107,35 @@ export function createDefaultCurvePoints(): CurvePoint[] {
 /** Deep copy so presets and live state never share point objects. */
 export function cloneCurvePoints(points: CurvePoint[]): CurvePoint[] {
   return points.map((p) => ({ ...p }));
+}
+
+export function createDefaultToneCurveState(): ToneCurveState {
+  return Object.fromEntries(
+    CURVE_CHANNELS.map((channel) => [channel, createDefaultCurvePoints()]),
+  ) as ToneCurveState;
+}
+
+/** Deep copy so presets and live state never share channel point arrays. */
+export function cloneToneCurveState(curves: ToneCurveState): ToneCurveState {
+  return Object.fromEntries(
+    CURVE_CHANNELS.map((channel) => [channel, cloneCurvePoints(curves[channel])]),
+  ) as ToneCurveState;
+}
+
+/**
+ * Read current curve state while accepting the single master `curvePoints`
+ * field written by releases before per-channel curves existed.
+ */
+export function normalizeToneCurveState(
+  curves: Partial<ToneCurveState> | undefined,
+  legacyMaster?: CurvePoint[],
+): ToneCurveState {
+  const defaults = createDefaultToneCurveState();
+  for (const channel of CURVE_CHANNELS) {
+    const points = curves?.[channel] ?? (channel === 'rgb' ? legacyMaster : undefined);
+    if (points && points.length >= 2) defaults[channel] = cloneCurvePoints(points);
+  }
+  return defaults;
 }
 
 // --- crop ----------------------------------------------------------------------
@@ -125,7 +159,7 @@ export interface EditState {
   saturation: number; // -100..100  (0 = unchanged)
   colorMix: ColorMixState;
   colorGrade: ColorGradeState;
-  curvePoints: CurvePoint[];
+  toneCurves: ToneCurveState;
   // null = full, uncropped image.
   crop: CropRect | null;
   // Mirror the image horizontally/vertically — per-photo geometry, like crop.
@@ -147,7 +181,7 @@ export function createDefaultEditState(): EditState {
     saturation: 0,
     colorMix: createDefaultColorMixState(),
     colorGrade: createDefaultColorGradeState(),
-    curvePoints: createDefaultCurvePoints(),
+    toneCurves: createDefaultToneCurveState(),
     crop: null,
     flipHorizontal: false,
     flipVertical: false,
@@ -178,7 +212,7 @@ export function resetDevelopSettings(state: EditState): void {
   for (const zone of GRADE_ZONES) {
     Object.assign(state.colorGrade[zone], { hue: 0, saturation: 0, luminance: 0 });
   }
-  state.curvePoints = createDefaultCurvePoints();
+  state.toneCurves = createDefaultToneCurveState();
 }
 
 /** Reset every field back to defaults for a newly opened photo. */
@@ -212,7 +246,7 @@ export function capturePresetSettings(state: EditState): PresetSettings {
     saturation: state.saturation,
     colorMix: cloneColorMixState(state.colorMix),
     colorGrade: cloneColorGradeState(state.colorGrade),
-    curvePoints: cloneCurvePoints(state.curvePoints),
+    toneCurves: cloneToneCurveState(state.toneCurves),
   };
 }
 
@@ -237,7 +271,8 @@ export function applyPresetSettings(state: EditState, settings: PresetSettings):
     // Presets saved before color grading existed have no colorGrade — treat as neutral.
     Object.assign(state.colorGrade[zone], settings.colorGrade?.[zone] ?? { hue: 0, saturation: 0, luminance: 0 });
   }
-  state.curvePoints = cloneCurvePoints(settings.curvePoints);
+  const stored = settings as PresetSettings & { curvePoints?: CurvePoint[] };
+  state.toneCurves = normalizeToneCurveState(stored.toneCurves, stored.curvePoints);
   return state;
 }
 
@@ -280,7 +315,13 @@ export function loadSessionEditState(): EditState | null {
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
-    return { ...createDefaultEditState(), ...(parsed as Partial<EditState>) };
+    const stored = parsed as Partial<EditState> & { curvePoints?: CurvePoint[] };
+    const { curvePoints: legacyMaster, ...currentFields } = stored;
+    return {
+      ...createDefaultEditState(),
+      ...currentFields,
+      toneCurves: normalizeToneCurveState(stored.toneCurves, legacyMaster),
+    };
   } catch {
     return null; // corrupt or unavailable storage — fall back to defaults
   }

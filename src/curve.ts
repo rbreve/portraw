@@ -1,16 +1,31 @@
 // SVG tone-curve editor.
 //
 // Control points live in normalized [0,1]^2 space (x = input, y = output).
-// On every change the curve is interpolated with monotone cubic Hermite
-// splines (Fritsch–Carlson — no overshoot between points) and sampled into a
-// 256-entry LUT which the caller uploads as the shader's curve texture.
+// RGB is the master curve; Red, Green, and Blue are independent channel curves.
+// On every change all four are sampled into LUTs for one GPU texture upload.
 
-import { createDefaultCurvePoints, type CurvePoint } from './state';
+import {
+  cloneToneCurveState,
+  createDefaultCurvePoints,
+  createDefaultToneCurveState,
+  CURVE_CHANNELS,
+  type CurveChannel,
+  type CurvePoint,
+  type ToneCurveState,
+} from './state';
+import { buildCurveLut, buildCurveLuts, CURVE_LUT_SIZE, type CurveLutSet } from './curveLut';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const VIEW = 256; // svg viewBox size; also the LUT size
+const VIEW = CURVE_LUT_SIZE;
 const MIN_POINT_GAP_X = 0.02;
 const DOUBLE_CLICK_MS = 350;
+
+const CHANNEL_LABELS: Record<CurveChannel, string> = {
+  rgb: 'RGB',
+  red: 'Red',
+  green: 'Green',
+  blue: 'Blue',
+};
 
 export class CurveEditor {
   readonly element: HTMLElement;
@@ -18,7 +33,10 @@ export class CurveEditor {
   private readonly path: SVGPathElement;
   private readonly histogramPath: SVGPathElement;
   private readonly handleLayer: SVGGElement;
-  private points: CurvePoint[] = [];
+  private readonly resetButton: HTMLButtonElement;
+  private readonly channelButtons = new Map<CurveChannel, HTMLButtonElement>();
+  private toneCurves = createDefaultToneCurveState();
+  private activeChannel: CurveChannel = 'rgb';
   private dragIndex = -1;
   // Native 'dblclick' can't be used here: rebuild() replaces every handle
   // element on each pointerdown, and browsers key click-count tracking off
@@ -27,7 +45,21 @@ export class CurveEditor {
   private lastPointerDownAt = 0;
   private lastPointerDownIndex = -1;
 
-  constructor(private readonly onChange: (lut: Float32Array, points: CurvePoint[]) => void) {
+  constructor(private readonly onChange: (luts: CurveLutSet, curves: ToneCurveState) => void) {
+    const channelTabs = document.createElement('div');
+    channelTabs.className = 'segmented curve-channels';
+    channelTabs.setAttribute('role', 'tablist');
+    for (const channel of CURVE_CHANNELS) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = CHANNEL_LABELS[channel];
+      button.dataset.channel = channel;
+      button.setAttribute('role', 'tab');
+      button.addEventListener('click', () => this.selectChannel(channel));
+      this.channelButtons.set(channel, button);
+      channelTabs.append(button);
+    }
+
     this.svg = document.createElementNS(SVG_NS, 'svg');
     this.svg.setAttribute('viewBox', `0 0 ${VIEW} ${VIEW}`);
     this.svg.classList.add('curve-svg');
@@ -40,19 +72,23 @@ export class CurveEditor {
     this.handleLayer = document.createElementNS(SVG_NS, 'g');
     this.svg.append(this.histogramPath, this.path, this.handleLayer);
 
-    const resetButton = document.createElement('button');
-    resetButton.textContent = 'Reset curve';
-    resetButton.addEventListener('click', () => this.reset());
+    this.resetButton = document.createElement('button');
+    this.resetButton.addEventListener('click', () => this.resetActiveCurve());
 
     this.element = document.createElement('div');
     this.element.className = 'curve-editor';
-    this.element.append(this.svg, resetButton);
+    this.element.append(channelTabs, this.svg, this.resetButton);
 
     this.svg.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     this.svg.addEventListener('pointermove', (e) => this.onPointerMove(e));
     this.svg.addEventListener('pointerup', () => (this.dragIndex = -1));
 
-    this.reset();
+    this.updateChannelUi();
+    this.resetAll();
+  }
+
+  private get points(): CurvePoint[] {
+    return this.toneCurves[this.activeChannel];
   }
 
   /**
@@ -76,21 +112,46 @@ export class CurveEditor {
     this.histogramPath.setAttribute('d', d.join(' '));
   }
 
-  /** Back to the identity (linear) curve. */
-  reset(): void {
-    this.points = createDefaultCurvePoints();
+  /** Reset the selected channel without disturbing the other curves. */
+  resetActiveCurve(): void {
+    this.toneCurves[this.activeChannel] = createDefaultCurvePoints();
     this.rebuild();
   }
 
-  /** A copy of the current control points (e.g. to persist in a preset/session). */
-  getPoints(): CurvePoint[] {
-    return this.points.map((p) => ({ ...p }));
+  /** Back to four identity (linear) curves. */
+  resetAll(): void {
+    this.toneCurves = createDefaultToneCurveState();
+    this.rebuild();
   }
 
-  /** Replace the curve with externally-supplied points (e.g. from a loaded preset/session) and redraw. */
-  setPoints(points: CurvePoint[]): void {
-    this.points = points.map((p) => ({ x: clamp01(p.x), y: clamp01(p.y) }));
+  /** Replace all curves from a loaded preset/session and redraw. */
+  setToneCurves(curves: ToneCurveState): void {
+    this.toneCurves = cloneToneCurveState(curves);
+    for (const channel of CURVE_CHANNELS) {
+      this.toneCurves[channel] = this.toneCurves[channel].map((point) => ({
+        x: clamp01(point.x),
+        y: clamp01(point.y),
+      }));
+    }
     this.rebuild();
+  }
+
+  private selectChannel(channel: CurveChannel): void {
+    if (this.activeChannel === channel) return;
+    this.activeChannel = channel;
+    this.dragIndex = -1;
+    this.updateChannelUi();
+    this.rebuild(false);
+  }
+
+  private updateChannelUi(): void {
+    this.element?.setAttribute('data-channel', this.activeChannel);
+    for (const [channel, button] of this.channelButtons) {
+      const selected = channel === this.activeChannel;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-selected', String(selected));
+    }
+    this.resetButton.textContent = `Reset ${CHANNEL_LABELS[this.activeChannel]} curve`;
   }
 
   // --- pointer interaction ---------------------------------------------------
@@ -149,7 +210,7 @@ export class CurveEditor {
     const last = this.points.length - 1;
     // Endpoints can slide horizontally too, bounded by [0, 1] and by their
     // neighbor's gap; the curve flattens beyond the outermost point's x (see
-    // the clamp01 in sampleMonotoneCubic).
+    // the clamped segment parameter in buildCurveLut).
     const lo = index === 0 ? 0 : this.points[index - 1].x + MIN_POINT_GAP_X;
     const hi = index === last ? 1 : this.points[index + 1].x - MIN_POINT_GAP_X;
     const x = clamp(target.x, lo, hi);
@@ -159,8 +220,8 @@ export class CurveEditor {
 
   // --- rendering + LUT ---------------------------------------------------------
 
-  private rebuild(): void {
-    const lut = sampleMonotoneCubic(this.points, VIEW);
+  private rebuild(notify = true): void {
+    const lut = buildCurveLut(this.points);
 
     const d = Array.from(lut, (y, i) => {
       const px = (i / (VIEW - 1)) * VIEW;
@@ -180,62 +241,8 @@ export class CurveEditor {
       }),
     );
 
-    this.onChange(lut, this.getPoints());
+    if (notify) this.onChange(buildCurveLuts(this.toneCurves), cloneToneCurveState(this.toneCurves));
   }
-}
-
-// --- monotone cubic interpolation (Fritsch–Carlson) ---------------------------
-
-function sampleMonotoneCubic(points: CurvePoint[], size: number): Float32Array {
-  const n = points.length;
-  const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
-
-  // Secant slopes between knots, then knot tangents.
-  const slopes: number[] = [];
-  for (let i = 0; i < n - 1; i++) slopes.push((ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]));
-
-  const tangents = [slopes[0]];
-  for (let i = 1; i < n - 1; i++) {
-    // Opposite-sign secants mean a local extremum: flat tangent keeps it monotone.
-    tangents.push(slopes[i - 1] * slopes[i] <= 0 ? 0 : (slopes[i - 1] + slopes[i]) / 2);
-  }
-  tangents.push(slopes[n - 2]);
-
-  // Fritsch–Carlson limiter: clamp tangent magnitude so no segment overshoots.
-  for (let i = 0; i < n - 1; i++) {
-    if (slopes[i] === 0) {
-      tangents[i] = 0;
-      tangents[i + 1] = 0;
-      continue;
-    }
-    const a = tangents[i] / slopes[i];
-    const b = tangents[i + 1] / slopes[i];
-    const norm = Math.hypot(a, b);
-    if (norm > 3) {
-      tangents[i] = (3 / norm) * a * slopes[i];
-      tangents[i + 1] = (3 / norm) * b * slopes[i];
-    }
-  }
-
-  // Evaluate the Hermite segments at uniform x.
-  const lut = new Float32Array(size);
-  let segment = 0;
-  for (let k = 0; k < size; k++) {
-    const x = k / (size - 1);
-    while (segment < n - 2 && x > xs[segment + 1]) segment++;
-    const h = xs[segment + 1] - xs[segment];
-    const t = clamp01((x - xs[segment]) / h);
-    const t2 = t * t;
-    const t3 = t2 * t;
-    lut[k] = clamp01(
-      (2 * t3 - 3 * t2 + 1) * ys[segment] +
-        (t3 - 2 * t2 + t) * h * tangents[segment] +
-        (-2 * t3 + 3 * t2) * ys[segment + 1] +
-        (t3 - t2) * h * tangents[segment + 1],
-    );
-  }
-  return lut;
 }
 
 // --- small helpers -------------------------------------------------------------

@@ -7,8 +7,10 @@
 import * as twgl from 'twgl.js';
 import fragmentSource from './shader.frag?raw';
 import { colorGradeTuning } from './config';
+import { createIdentityCurveLuts, CURVE_LUT_SIZE, type CurveLutSet } from './curveLut';
 import {
   COLOR_BANDS,
+  CURVE_CHANNELS,
   GRADE_ZONES,
   TONE_ZONES,
   type ColorGradeState,
@@ -84,7 +86,7 @@ export class GlRenderer {
 
     this.imageTexture = gl.createTexture();
     this.curveLutTexture = gl.createTexture();
-    this.setCurveLut(identityLut());
+    this.setCurveLuts(createIdentityCurveLuts());
   }
 
   get hasImage(): boolean {
@@ -111,12 +113,30 @@ export class GlRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   }
 
-  /** Upload the 256-entry master tone curve as a 256x1 R16F texture. */
-  setCurveLut(lut: Float32Array): void {
+  /** Upload RGB master + per-channel curves as four rows of one R16F texture. */
+  setCurveLuts(luts: CurveLutSet): void {
     const gl = this.gl;
+    const pixels = new Float32Array(CURVE_LUT_SIZE * CURVE_CHANNELS.length);
+    CURVE_CHANNELS.forEach((channel, row) => {
+      const lut = luts[channel];
+      if (lut.length !== CURVE_LUT_SIZE) {
+        throw new Error(`${channel} curve LUT must contain ${CURVE_LUT_SIZE} entries`);
+      }
+      pixels.set(lut, row * CURVE_LUT_SIZE);
+    });
     gl.bindTexture(gl.TEXTURE_2D, this.curveLutTexture);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, lut.length, 1, 0, gl.RED, gl.FLOAT, lut);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.R16F,
+      CURVE_LUT_SIZE,
+      CURVE_CHANNELS.length,
+      0,
+      gl.RED,
+      gl.FLOAT,
+      pixels,
+    );
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -296,12 +316,6 @@ export class GlRenderer {
     const h = Math.round(contentH * scale);
     this.gl.viewport(Math.round((bufferW - w) / 2), Math.round((bufferH - h) / 2), w, h);
   }
-}
-
-function identityLut(): Float32Array {
-  const lut = new Float32Array(256);
-  for (let i = 0; i < 256; i++) lut[i] = i / 255;
-  return lut;
 }
 
 /**

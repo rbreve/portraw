@@ -5,7 +5,14 @@
 // least one browser prompt; IndexedDB needs none. Edits load/save silently in
 // the background, catalog-style — open a photo, edit it, browse away, come
 // back, the edits are just there.
-import { captureSidecarSettings, createDefaultEditState, type EditState, type SidecarSettings } from './state';
+import {
+  captureSidecarSettings,
+  createDefaultEditState,
+  normalizeToneCurveState,
+  type CurvePoint,
+  type EditState,
+  type SidecarSettings,
+} from './state';
 
 const DB_NAME = 'portraw-edits';
 const STORE_NAME = 'edits';
@@ -46,7 +53,13 @@ export async function loadEditCache(key: string): Promise<SidecarSettings | unde
     request.onsuccess = () => resolve(request.result as SidecarSettings | undefined);
     request.onerror = () => reject(request.error as Error);
   });
-  return raw && { ...captureSidecarSettings(createDefaultEditState()), ...raw };
+  if (!raw) return undefined;
+  const stored = raw as SidecarSettings & { curvePoints?: CurvePoint[] };
+  return {
+    ...captureSidecarSettings(createDefaultEditState()),
+    ...raw,
+    toneCurves: normalizeToneCurveState(stored.toneCurves, stored.curvePoints),
+  };
 }
 
 /** Save a photo's current edits, overwriting any previous entry for this key. */

@@ -146,8 +146,8 @@ function resetControlsForNewFile(): void {
   for (const [key, slider] of developSliders) slider.setValue(editState[key]);
   colorMixerPanel.syncFromState();
   colorGradePanel.syncFromState();
-  if (pendingCachedEdits) curveEditor.setPoints(editState.curvePoints);
-  else curveEditor.reset();
+  if (pendingCachedEdits) curveEditor.setToneCurves(editState.toneCurves);
+  else curveEditor.resetAll();
   for (const input of document.querySelectorAll<HTMLInputElement>('#debug-panel input[type=checkbox]')) {
     input.checked = false;
   }
@@ -317,20 +317,20 @@ const presetPanel = new PresetPanel(new PresetStore(), {
     for (const [key, slider] of developSliders) slider.setValue(editState[key]);
     colorMixerPanel.syncFromState();
     colorGradePanel.syncFromState();
-    curveEditor.setPoints(editState.curvePoints);
+    curveEditor.setToneCurves(editState.toneCurves);
     render();
   },
 });
 document.querySelector('#preset-panel')!.append(presetPanel.element);
 
-// --- tone curve ----------------------------------------------------------------
+// --- tone curves ---------------------------------------------------------------
 
-const curveEditor = new CurveEditor((lut, points) => {
-  editState.curvePoints = points;
-  renderer.setCurveLut(lut);
+const curveEditor = new CurveEditor((luts, curves) => {
+  editState.toneCurves = curves;
+  renderer.setCurveLuts(luts);
   render();
 });
-curveEditor.setPoints(editState.curvePoints);
+curveEditor.setToneCurves(editState.toneCurves);
 document.querySelector('#curve-panel')!.append(curveEditor.element);
 
 // --- debug toggles ---------------------------------------------------------------
@@ -338,7 +338,7 @@ document.querySelector('#curve-panel')!.append(curveEditor.element);
 type DebugKey = 'bypassCurve' | 'showLinear' | 'showClipping';
 
 const debugConfigs: Array<{ key: DebugKey; label: string }> = [
-  { key: 'bypassCurve', label: 'Bypass tone curve' },
+  { key: 'bypassCurve', label: 'Bypass tone curves' },
   { key: 'showLinear', label: 'Show linear (pre-gamma)' },
   { key: 'showClipping', label: 'Show clipping overlay' },
 ];
@@ -357,7 +357,7 @@ document.querySelector('#debug-panel')!.append(
 );
 
 // --- reset edits ---------------------------------------------------------------
-// Clears develop sliders, color mixer, color grading, and the tone curve back to
+// Clears develop sliders, color mixer, color grading, and all tone curves back to
 // defaults — mirrors what applying a preset would touch, so crop and debug
 // toggles (outside that set) are left alone.
 
@@ -366,7 +366,7 @@ function resetEdits(): void {
   for (const [key, slider] of developSliders) slider.setValue(editState[key]);
   colorMixerPanel.syncFromState();
   colorGradePanel.syncFromState();
-  curveEditor.setPoints(editState.curvePoints);
+  curveEditor.setToneCurves(editState.toneCurves);
   render();
 }
 
@@ -404,7 +404,7 @@ document.querySelector<HTMLButtonElement>('#paste-settings')!.addEventListener('
       for (const [key, slider] of developSliders) slider.setValue(editState[key]);
       colorMixerPanel.syncFromState();
       colorGradePanel.syncFromState();
-      curveEditor.setPoints(editState.curvePoints);
+      curveEditor.setToneCurves(editState.toneCurves);
       render();
       refreshExportPreview();
       statusLine.textContent = 'Settings pasted';
