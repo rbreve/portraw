@@ -37,8 +37,8 @@ void main() {
 
 // --- Instagram-style export framing ---------------------------------------------
 // "original" exports the (possibly cropped) photo pixels as-is. The other three
-// composite the photo onto a fixed-size canvas at Instagram's own recommended
-// pixel dimensions, centered and scaled down to fit (never upscaled beyond fit),
+// composite the photo onto a canvas with Instagram's recommended aspect ratio
+// at the user-selected width, centered and scaled down to fit,
 // so the whole photo survives Instagram's feed crop instead of being clipped.
 export type ExportFormat = 'original' | 'square' | 'horizontal' | 'vertical';
 
@@ -47,6 +47,8 @@ export interface ExportFrameOptions {
   /** 0..100, padding between the photo and the canvas edge as % of the canvas's shorter side. 0 = no extra border. */
   borderPercent: number;
   borderColor: string;
+  /** Final exported canvas width in pixels. */
+  width: number;
 }
 
 export const FRAME_SIZES: Record<Exclude<ExportFormat, 'original'>, { width: number; height: number }> = {
@@ -157,7 +159,7 @@ export class GlRenderer {
     this.draw(state, crop);
   }
 
-  /** Render the cropped region at full image resolution and encode via canvas.toBlob. */
+  /** Render the cropped region, resize/frame it to the requested output width, and encode it. */
   async exportBlob(state: EditState, mimeType: string, quality?: number, frame?: ExportFrameOptions): Promise<Blob> {
     if (!this.hasImage) throw new Error('no image loaded');
     const gl = this.gl;
@@ -170,11 +172,11 @@ export class GlRenderer {
     this.draw(state, crop);
 
     try {
-      if (!frame || (frame.format === 'original' && frame.borderPercent <= 0)) {
+      if (!frame) {
         return await canvasToBlob(this.canvas, mimeType, quality);
       }
       if (frame.format === 'original') {
-        return await this.composeBorderedOriginalBlob(width, height, frame, mimeType, quality);
+        return await this.composeOriginalBlob(width, height, frame, mimeType, quality);
       }
       return await this.composeFramedBlob(width, height, frame, mimeType, quality);
     } finally {
@@ -211,7 +213,7 @@ export class GlRenderer {
    * each dimension so the framed canvas keeps the exact same aspect ratio as the
    * (possibly cropped) source photo.
    */
-  private async composeBorderedOriginalBlob(
+  private async composeOriginalBlob(
     contentW: number,
     contentH: number,
     frame: ExportFrameOptions,
@@ -219,10 +221,12 @@ export class GlRenderer {
     quality?: number,
   ): Promise<Blob> {
     const p = frame.borderPercent / 100;
-    const canvasW = Math.round(contentW * (1 + 2 * p));
-    const canvasH = Math.round(contentH * (1 + 2 * p));
-    const dx = Math.round((canvasW - contentW) / 2);
-    const dy = Math.round((canvasH - contentH) / 2);
+    const canvasW = Math.max(1, Math.round(frame.width));
+    const canvasH = Math.max(1, Math.round(canvasW * contentH / contentW));
+    const drawW = canvasW / (1 + 2 * p);
+    const drawH = canvasH / (1 + 2 * p);
+    const dx = (canvasW - drawW) / 2;
+    const dy = (canvasH - drawH) / 2;
 
     const framed = document.createElement('canvas');
     framed.width = canvasW;
@@ -231,12 +235,12 @@ export class GlRenderer {
     if (!ctx) throw new Error('2D canvas context unavailable');
     ctx.fillStyle = frame.borderColor;
     ctx.fillRect(0, 0, canvasW, canvasH);
-    ctx.drawImage(this.canvas, 0, 0, contentW, contentH, dx, dy, contentW, contentH);
+    ctx.drawImage(this.canvas, 0, 0, contentW, contentH, dx, dy, drawW, drawH);
 
     return canvasToBlob(framed, mimeType, quality);
   }
 
-  /** Composite the just-drawn photo (still sitting in this.canvas) onto a fixed-size Instagram canvas. Caller guarantees frame.format !== 'original'. */
+  /** Composite the just-drawn photo onto a selected-width Instagram-aspect canvas. Caller guarantees frame.format !== 'original'. */
   private async composeFramedBlob(
     contentW: number,
     contentH: number,
@@ -244,7 +248,9 @@ export class GlRenderer {
     mimeType: string,
     quality?: number,
   ): Promise<Blob> {
-    const { width: canvasW, height: canvasH } = FRAME_SIZES[frame.format as Exclude<ExportFormat, 'original'>];
+    const referenceSize = FRAME_SIZES[frame.format as Exclude<ExportFormat, 'original'>];
+    const canvasW = Math.max(1, Math.round(frame.width));
+    const canvasH = Math.max(1, Math.round(canvasW * referenceSize.height / referenceSize.width));
     const borderPx = (frame.borderPercent / 100) * Math.min(canvasW, canvasH);
     const innerW = Math.max(1, canvasW - borderPx * 2);
     const innerH = Math.max(1, canvasH - borderPx * 2);

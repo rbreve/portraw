@@ -244,6 +244,10 @@ body {
   color: #fff;
 }
 
+#copy-settings {
+  margin-top: auto;
+}
+
 /* --- folder browser -------------------------------------------------------- */
 
 .file-button {
@@ -1012,10 +1016,16 @@ input[type='range']:not(.slider-input) {
   border: 1px solid var(--panel-edge);
   cursor: crosshair;
   touch-action: none;
-  /* Hue 0 (red) east, increasing counter-clockwise — matches colorGrade.ts. */
+  /* A compact white neutral point, quickly transitioning into vivid hues. */
   background:
-    radial-gradient(circle closest-side, #232327 0%, rgba(35, 35, 39, 0) 100%),
-    conic-gradient(from 90deg, #f00, #f0f, #00f, #0ff, #0f0, #ff0, #f00);
+    radial-gradient(
+      circle closest-side,
+      #fff 0%,
+      rgba(255, 255, 255, 0.82) 8%,
+      rgba(255, 255, 255, 0.28) 28%,
+      rgba(255, 255, 255, 0) 55%
+    ),
+    conic-gradient(from 90deg, #e95c55, #c857c7, #507de1, #3fb9c8, #43bd74, #efc34d, #e95c55);
 }
 
 .grade-handle {
@@ -1397,4 +1407,51 @@ button.primary:hover {
   min-height: 0;
   border-radius: 2px;
   background: linear-gradient(135deg, #4a4a52, #2c2c32);
+}
+
+.export-resolution {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.export-resolution-header,
+.export-resolution-bounds {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.export-resolution-header label {
+  font-size: 12px;
+}
+
+.export-resolution-value {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.export-resolution-input {
+  width: 78px;
+  padding: 3px 6px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 5px;
+  background: rgba(12, 12, 14, 0.35);
+  color: var(--text);
+  font: inherit;
+  text-align: right;
+}
+
+.export-resolution-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.export-resolution-bounds {
+  color: var(--text-dim);
+  font-size: 10.5px;
 }

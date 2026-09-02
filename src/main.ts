@@ -75,8 +75,14 @@ function currentContentAspect(): number {
   return w / h;
 }
 
+function currentContentWidth(): number {
+  if (!imgWidth) return 0;
+  return (editState.crop?.width ?? 1) * imgWidth;
+}
+
 /** Re-sync the export preview's aspect ratio + thumbnail with the current photo/crop/edits. */
 function refreshExportPreview(): void {
+  if (imgWidth) exportPanel.setOriginalWidth(currentContentWidth());
   exportPanel.setPhotoAspect(currentContentAspect());
   exportPanel.setPhotoThumbnail(renderer.hasImage ? renderer.renderThumbnail(editState, 200) : null);
 }
@@ -122,6 +128,7 @@ decodeWorker.onmessage = ({ data }: MessageEvent<DecodeResponse>) => {
       if (activeTab === 'crop') cropOverlay.startArranging();
       imgWidth = data.width;
       imgHeight = data.height;
+      exportPanel.setOriginalWidth(currentContentWidth(), data.stage === 'preview');
       curveEditor.setHistogram(data.histogram);
       render();
       refreshExportPreview();
