@@ -1,9 +1,10 @@
 // Folder browser: pick a directory via the File System Access API and list
-// its DNG files so you can click through a shoot without re-opening a file
+// its RAW files so you can click through a shoot without re-opening a file
 // picker for each one. Supported in Chrome/Edge; not in Safari/Firefox
 // (unimplemented) or Brave (deliberately disabled for privacy) — the button
 // disables itself when unsupported.
 import { GalleryOverlay, galleryIcons } from './gallery';
+import { isRawFile } from './rawFormats';
 import { generateThumbnail } from './thumbnail';
 import { getCachedThumbnail, putCachedThumbnail, thumbnailCacheKey } from './thumbnailCache';
 
@@ -125,7 +126,7 @@ export class FolderPanel {
 
     const entries: Array<{ name: string; handle: FileSystemFileHandle }> = [];
     for await (const handle of dirHandle.values()) {
-      if (handle.kind === 'file' && /\.dng$/i.test(handle.name)) {
+      if (handle.kind === 'file' && isRawFile(handle.name)) {
         entries.push({ name: handle.name, handle: handle as FileSystemFileHandle });
       }
     }
@@ -157,7 +158,7 @@ export class FolderPanel {
     if (folderEntries.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'folder-empty';
-      empty.textContent = 'No .dng files in this folder.';
+      empty.textContent = 'No RAW files in this folder.';
       this.listEl.append(empty);
       return;
     }

@@ -29,12 +29,14 @@ import {
   type SidecarSettings,
 } from './state';
 import type { DecodeRequest, DecodeResponse } from './decode.worker';
+import { RAW_ACCEPT } from './rawFormats';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
 const viewport = document.querySelector<HTMLElement>('#viewport')!;
 const dropOverlay = document.querySelector<HTMLElement>('#drop-overlay')!;
 const statusLine = document.querySelector<HTMLElement>('#status')!;
 const fileInput = document.querySelector<HTMLInputElement>('#file-input')!;
+fileInput.accept = RAW_ACCEPT;
 
 const editState: EditState = loadSessionEditState() ?? createDefaultEditState();
 const renderer = new GlRenderer(canvas);

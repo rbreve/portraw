@@ -2,7 +2,7 @@
 // ============================================================================
 // decode.worker.ts — STAGE 1 of the two-stage architecture.
 //
-// The DNG is decoded here EXACTLY ONCE per file (plus an optional fast
+// The RAW file is decoded here EXACTLY ONCE (plus an optional fast
 // half-size pass for instant preview). All subsequent edits happen in the
 // fragment shader (stage 2) by changing uniforms — this worker is never
 // touched again until a new file is dropped.
