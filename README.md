@@ -3,7 +3,7 @@
 A lightweight web-based RAW (DNG) photo editor — "lite Lightroom" — in vanilla
 TypeScript with no UI framework.
 
-<img width="1704" height="872" alt="Screenshot 2026-08-22 at 0 40 18" src="https://github.com/user-attachments/assets/b46f3539-607b-468c-95e7-9852e585d6d5" />
+ <img width="1697" height="929" alt="Screenshot 2026-09-05 at 2 20 13" src="https://github.com/user-attachments/assets/3cb9f3c3-dfa9-43d2-9596-34b3bb9ae105" />
 
 
 
