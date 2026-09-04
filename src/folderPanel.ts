@@ -93,7 +93,6 @@ export class FolderPanel {
       return;
     }
 
-    this.setViewMode('list');
     const generation = ++this.generation;
     for (const url of this.thumbnailUrls) URL.revokeObjectURL(url);
     this.thumbnailUrls.clear();
