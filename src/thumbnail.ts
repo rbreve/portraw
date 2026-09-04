@@ -1,6 +1,6 @@
 // Cheap thumbnail generation for the folder browser. Deliberately NOT the
 // same path as decode.worker.ts's preview decode: this pulls the small JPEG
-// preview DNGs carry embedded (skips demosaicing entirely, near-instant),
+// preview most RAW files carry embedded (skips demosaicing, near-instant),
 // falling back to a half-size RAW decode only when a file has none.
 //
 // The heavy lifting (LibRaw's own decode) already happens off the main

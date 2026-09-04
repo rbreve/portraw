@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>portraw — DNG editor</title>
+    <title>portraw — RAW editor</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -21,7 +21,8 @@
         <div id="folder-panel">
           <label class="file-button">
             Open RAW…
-            <input id="file-input" type="file" accept=".dng,.DNG" hidden />
+            <!-- accept list is set from rawFormats.ts at startup -->
+            <input id="file-input" type="file" hidden />
           </label>
         </div>
       </aside>
@@ -29,7 +30,7 @@
       <main id="viewport">
         <canvas id="view"></canvas>
         <div id="drop-overlay">
-          <p><strong>Drop a DNG file</strong></p>
+          <p><strong>Drop a RAW file</strong></p>
           <p>or use “Open RAW…” in the panel</p>
         </div>
       </main>

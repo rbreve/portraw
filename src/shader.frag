@@ -66,15 +66,19 @@ uniform bool u_showClipping;  // paint blown / crushed pixels
 // Rec.709 luma weights — correct for sRGB-primary data.
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
-// Strength of a full slider deflection, in EV stops applied at mask peak.
-// HIGHLIGHT_STRENGTH is 2 stops so the slider can reach the recovered raw
-// headroom: the input texture is scene-referred with values above 1.0 where
-// the sensor captured more than the nominal white point (see decode.worker.ts)
-// — typically 1-1.5 stops, more under strongly coloured light.
+// Strength of a full positive slider deflection, in EV stops at mask peak.
+// Negative highlights use the monotonic shoulder below instead: applying a
+// negative EV gain through a luminance mask can reverse tones when the mask
+// changes faster than the gain, making brighter input render darker.
 const float TEMP_STRENGTH      = 0.50;
 const float TINT_STRENGTH      = 0.35;
 const float HIGHLIGHT_STRENGTH = 2.00;
 const float SHADOW_STRENGTH    = 1.80;
+
+// Linear-light point where full negative Highlights begins its shoulder.
+// 0.18 linear is roughly 46% in sRGB, matching HIGHLIGHT_MID_REACH while
+// preserving everything below the highlight range exactly.
+const float HIGHLIGHT_RECOVERY_KNEE = 0.18;
 
 // Highlight mask shaping (all in sRGB-encoded luminance, 0..1):
 //   KNEE       — where the full-strength highlight zone begins. Raise to
@@ -124,6 +128,32 @@ vec3 linearToSrgb(vec3 c) {
     vec3 lo = c * 12.92;
     vec3 hi = 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055;
     return mix(lo, hi, step(vec3(0.0031308), c));
+}
+
+// ----------------------------------------------------------------------------
+// Negative Highlights: a monotonic shoulder over the brightest RGB channel.
+// The rational curve is identity at the knee, approaches display white for
+// arbitrarily bright input, and has a strictly positive derivative. Scaling
+// every channel by the same ratio preserves hue and keeps full recovery from
+// clipping individual channels independently.
+// ----------------------------------------------------------------------------
+vec3 recoverHighlights(vec3 c, float amount) {
+    float peak = max(max(c.r, c.g), c.b);
+    if (peak <= HIGHLIGHT_RECOVERY_KNEE) return c;
+
+    float range = 1.0 - HIGHLIGHT_RECOVERY_KNEE;
+    float excess = peak - HIGHLIGHT_RECOVERY_KNEE;
+    float recoveredPeak = HIGHLIGHT_RECOVERY_KNEE
+                        + range * excess / (range + excess);
+    float targetPeak = mix(peak, recoveredPeak, amount);
+    return c * (targetPeak / peak);
+}
+
+float highlightWeight(float perceptualLuminance) {
+    float highlightZone = smoothstep(HIGHLIGHT_KNEE, 1.0, perceptualLuminance);
+    float midtoneTail = smoothstep(HIGHLIGHT_MID_REACH, HIGHLIGHT_KNEE, perceptualLuminance)
+                      * HIGHLIGHT_MID_AMOUNT;
+    return mix(midtoneTail, 1.0, highlightZone);
 }
 
 // ----------------------------------------------------------------------------
@@ -268,17 +298,14 @@ void main() {
     {
         float lum = dot(c, LUMA);
         float perceptual = linearToSrgb(vec3(lum)).x;
-        // Two-part highlight mask: a full-strength zone above the knee plus a
-        // gentler midtone tail below it, blended smoothly so the slider also
-        // nudges midtones without dragging them as hard as the highlights.
-        float highlightZone = smoothstep(HIGHLIGHT_KNEE, 1.0, perceptual);
-        float midtoneTail = smoothstep(HIGHLIGHT_MID_REACH, HIGHLIGHT_KNEE, perceptual)
-                            * HIGHLIGHT_MID_AMOUNT;
-        float highlightMask = mix(midtoneTail, 1.0, highlightZone);
         float shadowMask = 1.0 - smoothstep(0.0, 0.55, perceptual); // 1 in shadows
-        // Negative u_highlights darkens (recovers) highlights; positive
-        // u_shadows lifts shadows. Multiplicative gain preserves hue.
-        c *= exp2(u_highlights * HIGHLIGHT_STRENGTH * highlightMask);
+        // Recovery uses a monotonic, hue-preserving shoulder. Positive
+        // Highlights retains the luminance-masked exposure-style boost.
+        if (u_highlights < 0.0) {
+            c = recoverHighlights(c, -u_highlights);
+        } else {
+            c *= exp2(u_highlights * HIGHLIGHT_STRENGTH * highlightWeight(perceptual));
+        }
         c *= exp2(u_shadows * SHADOW_STRENGTH * shadowMask);
     }
 

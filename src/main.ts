@@ -29,12 +29,14 @@ import {
   type SidecarSettings,
 } from './state';
 import type { DecodeRequest, DecodeResponse } from './decode.worker';
+import { RAW_ACCEPT } from './rawFormats';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
 const viewport = document.querySelector<HTMLElement>('#viewport')!;
 const dropOverlay = document.querySelector<HTMLElement>('#drop-overlay')!;
 const statusLine = document.querySelector<HTMLElement>('#status')!;
 const fileInput = document.querySelector<HTMLInputElement>('#file-input')!;
+fileInput.accept = RAW_ACCEPT;
 
 const editState: EditState = loadSessionEditState() ?? createDefaultEditState();
 const renderer = new GlRenderer(canvas);
@@ -75,8 +77,14 @@ function currentContentAspect(): number {
   return w / h;
 }
 
+function currentContentWidth(): number {
+  if (!imgWidth) return 0;
+  return (editState.crop?.width ?? 1) * imgWidth;
+}
+
 /** Re-sync the export preview's aspect ratio + thumbnail with the current photo/crop/edits. */
 function refreshExportPreview(): void {
+  if (imgWidth) exportPanel.setOriginalWidth(currentContentWidth());
   exportPanel.setPhotoAspect(currentContentAspect());
   exportPanel.setPhotoThumbnail(renderer.hasImage ? renderer.renderThumbnail(editState, 200) : null);
 }
@@ -122,6 +130,7 @@ decodeWorker.onmessage = ({ data }: MessageEvent<DecodeResponse>) => {
       if (activeTab === 'crop') cropOverlay.startArranging();
       imgWidth = data.width;
       imgHeight = data.height;
+      exportPanel.setOriginalWidth(currentContentWidth(), data.stage === 'preview');
       curveEditor.setHistogram(data.histogram);
       render();
       refreshExportPreview();

@@ -127,7 +127,8 @@ export class ColorGradePanel {
     const radius = grade.saturation / 100;
     handle.style.left = `${50 + Math.cos(angle) * radius * 50}%`;
     handle.style.top = `${50 - Math.sin(angle) * radius * 50}%`;
-    handle.style.background = `hsl(${grade.hue} ${grade.saturation}% 50%)`;
+    const lightness = 100 - grade.saturation * 0.5;
+    handle.style.background = `hsl(${grade.hue} ${grade.saturation}% ${lightness}%)`;
     handle.classList.toggle('has-edits', hasEdits(grade));
     lumInput.value = String(grade.luminance);
     lumReadout.textContent = String(grade.luminance);

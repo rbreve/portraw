@@ -1,6 +1,6 @@
 // Instagram-style export framing: pick a canvas format (square / horizontal /
-// vertical, at Instagram's own recommended pixel sizes — see FRAME_SIZES in
-// gl.ts) and optionally pad the photo with a border so the whole shot fits
+// vertical, using Instagram's recommended aspect ratios — see FRAME_SIZES in
+// gl.ts), choose the output width, and optionally pad the photo so the whole shot fits
 // inside without Instagram's feed auto-crop clipping it. This module only
 // owns the settings UI + a live preview swatch; the actual pixel compositing
 // happens in GlRenderer.exportBlob.
@@ -11,6 +11,7 @@ export interface ExportFrameSettings {
   format: ExportFormat;
   borderPercent: number;
   borderColor: string;
+  width: number;
 }
 
 const FORMAT_LABELS: Record<ExportFormat, string> = {
@@ -26,6 +27,7 @@ const FORMATS = ['original', 'square', 'horizontal', 'vertical'] as const;
 // "square-fit" look most Instagram padding apps default to.
 const BORDER_COLOR = '#ffffff';
 const PREVIEW_MAX_WIDTH = 240;
+const MIN_EXPORT_WIDTH = 640;
 
 export class ExportPanel {
   readonly element: HTMLElement;
@@ -33,10 +35,17 @@ export class ExportPanel {
   private readonly formatButtons = new Map<ExportFormat, HTMLButtonElement>();
   private readonly previewBox: HTMLElement;
   private readonly previewPhoto: HTMLElement;
+  private readonly widthInput: HTMLInputElement;
+  private readonly widthTextInput: HTMLInputElement;
+  private readonly widthMinimum: HTMLElement;
+  private readonly widthMaximum: HTMLElement;
 
   private format: ExportFormat = 'original';
   private borderPercent = 6;
   private photoAspect = 1;
+  private originalWidth = MIN_EXPORT_WIDTH;
+  private exportWidth = MIN_EXPORT_WIDTH;
+  private followsOriginalWidth = true;
 
   constructor() {
     const formatGrid = document.createElement('div');
@@ -57,6 +66,70 @@ export class ExportPanel {
     this.previewBox.className = 'export-preview hidden';
     this.previewBox.append(this.previewPhoto);
 
+    const resolutionLabel = document.createElement('label');
+    resolutionLabel.htmlFor = 'export-width-value';
+    resolutionLabel.textContent = 'Resolution width';
+
+    this.widthTextInput = document.createElement('input');
+    this.widthTextInput.id = 'export-width-value';
+    this.widthTextInput.type = 'number';
+    this.widthTextInput.className = 'export-resolution-input';
+    this.widthTextInput.min = String(MIN_EXPORT_WIDTH);
+    this.widthTextInput.max = String(MIN_EXPORT_WIDTH);
+    this.widthTextInput.step = '1';
+    this.widthTextInput.value = String(MIN_EXPORT_WIDTH);
+    this.widthTextInput.disabled = true;
+    this.widthTextInput.addEventListener('input', () => {
+      const value = this.widthTextInput.valueAsNumber;
+      const minimumWidth = this.getMinimumWidth();
+      if (Number.isFinite(value) && value >= minimumWidth && value <= this.originalWidth) {
+        this.setExportWidth(value);
+      }
+    });
+    this.widthTextInput.addEventListener('change', () => this.commitWidthTextInput());
+    this.widthTextInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        this.commitWidthTextInput();
+        this.widthTextInput.select();
+      }
+    });
+
+    const resolutionValue = document.createElement('div');
+    resolutionValue.className = 'export-resolution-value';
+    resolutionValue.append(this.widthTextInput, 'px');
+
+    const resolutionHeader = document.createElement('div');
+    resolutionHeader.className = 'export-resolution-header';
+    resolutionHeader.append(resolutionLabel, resolutionValue);
+
+    this.widthInput = document.createElement('input');
+    this.widthInput.id = 'export-width-slider';
+    this.widthInput.type = 'range';
+    this.widthInput.className = 'slider-input';
+    this.widthInput.setAttribute('aria-label', 'Resolution width');
+    this.widthInput.min = String(MIN_EXPORT_WIDTH);
+    this.widthInput.max = String(MIN_EXPORT_WIDTH);
+    this.widthInput.step = '1';
+    this.widthInput.value = String(MIN_EXPORT_WIDTH);
+    this.widthInput.disabled = true;
+    this.widthInput.addEventListener('input', () => {
+      this.setExportWidth(this.widthInput.valueAsNumber);
+    });
+
+    const resolutionTrack = document.createElement('div');
+    resolutionTrack.className = 'slider-track';
+    resolutionTrack.append(this.widthInput);
+
+    this.widthMinimum = document.createElement('span');
+    this.widthMaximum = document.createElement('span');
+    const resolutionBounds = document.createElement('div');
+    resolutionBounds.className = 'export-resolution-bounds';
+    resolutionBounds.append(this.widthMinimum, this.widthMaximum);
+
+    const resolution = document.createElement('div');
+    resolution.className = 'export-resolution';
+    resolution.append(resolutionHeader, resolutionTrack, resolutionBounds);
+
     const borderSlider = makeBoundSlider({
       label: 'Border size',
       min: 0,
@@ -71,8 +144,9 @@ export class ExportPanel {
 
     this.element = document.createElement('div');
     this.element.className = 'export-frame';
-    this.element.append(formatGrid, this.previewBox, borderSlider.element);
+    this.element.append(formatGrid, this.previewBox, resolution, borderSlider.element);
 
+    this.updateResolutionReadout();
     this.setFormat('original');
   }
 
@@ -81,7 +155,34 @@ export class ExportPanel {
       format: this.format,
       borderPercent: this.borderPercent,
       borderColor: BORDER_COLOR,
+      width: this.exportWidth,
     };
+  }
+
+  /** Keep the slider bounded by the current cropped photo's available pixel width. */
+  setOriginalWidth(width: number, resetToOriginal = false): void {
+    const previousOriginalWidth = this.originalWidth;
+    const roundedWidth = Math.max(1, Math.round(width));
+    const minimumWidth = Math.min(MIN_EXPORT_WIDTH, roundedWidth);
+    const wasAtOriginal = this.followsOriginalWidth || this.exportWidth === previousOriginalWidth;
+
+    this.originalWidth = roundedWidth;
+    if (resetToOriginal || wasAtOriginal) {
+      this.exportWidth = roundedWidth;
+      this.followsOriginalWidth = true;
+    } else {
+      this.exportWidth = Math.max(minimumWidth, Math.min(this.exportWidth, roundedWidth));
+      this.followsOriginalWidth = this.exportWidth === roundedWidth;
+    }
+
+    this.widthInput.min = String(minimumWidth);
+    this.widthInput.max = String(roundedWidth);
+    this.widthInput.value = String(this.exportWidth);
+    this.widthInput.disabled = roundedWidth === minimumWidth;
+    this.widthTextInput.min = String(minimumWidth);
+    this.widthTextInput.max = String(roundedWidth);
+    this.widthTextInput.disabled = roundedWidth === minimumWidth;
+    this.updateResolutionReadout();
   }
 
   /** Update the preview's inner rectangle to match the (possibly cropped) photo's aspect ratio. */
@@ -114,6 +215,32 @@ export class ExportPanel {
       button.classList.toggle('selected', key === format);
     }
     this.updatePreview();
+  }
+
+  private updateResolutionReadout(): void {
+    const minimumWidth = this.getMinimumWidth();
+    this.widthTextInput.value = String(this.exportWidth);
+    this.widthMinimum.textContent = `${minimumWidth} px`;
+    this.widthMaximum.textContent = `Original (${this.originalWidth} px)`;
+  }
+
+  private getMinimumWidth(): number {
+    return Math.min(MIN_EXPORT_WIDTH, this.originalWidth);
+  }
+
+  private setExportWidth(width: number): void {
+    this.exportWidth = Math.max(
+      this.getMinimumWidth(),
+      Math.min(Math.round(width), this.originalWidth),
+    );
+    this.followsOriginalWidth = this.exportWidth === this.originalWidth;
+    this.widthInput.value = String(this.exportWidth);
+    this.updateResolutionReadout();
+  }
+
+  private commitWidthTextInput(): void {
+    const value = this.widthTextInput.valueAsNumber;
+    this.setExportWidth(Number.isFinite(value) ? value : this.exportWidth);
   }
 
   private updatePreview(): void {
