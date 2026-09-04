@@ -285,45 +285,16 @@ body {
 .folder-view-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   flex-shrink: 0;
-}
-
-.folder-view-toggle {
-  display: flex;
-  flex-shrink: 0;
-  gap: 2px;
-  padding: 2px;
-  background: var(--bg);
-  border: 1px solid var(--panel-edge);
-  border-radius: 6px;
-}
-
-.folder-view-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-dim);
-}
-
-.folder-view-button:hover {
-  color: var(--text);
-}
-
-.folder-view-button.selected {
-  background: var(--accent);
-  color: #fff;
 }
 
 .folder-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  align-content: start;
+  gap: 8px;
+  padding: 8px;
   flex: 1;
   overflow-y: auto;
   min-height: 0;
@@ -338,15 +309,14 @@ body {
 
 .folder-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  flex-shrink: 0;
-  padding: 6px 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px;
   text-align: left;
   background: none;
   border: none;
-  border-radius: 0;
+  border-radius: 4px;
   color: var(--text);
   font: inherit;
   font-size: 12.5px;
@@ -362,8 +332,8 @@ body {
 }
 
 .folder-thumb {
-  width: 36px;
-  height: 36px;
+  width: 100%;
+  height: 72px;
   flex-shrink: 0;
   border-radius: 4px;
   background-color: var(--panel-edge);
@@ -377,34 +347,6 @@ body {
 
 .folder-item-name {
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.folder-list.grid-mode {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  align-content: start;
-  gap: 8px;
-  padding: 8px;
-}
-
-.folder-list.grid-mode .folder-item {
-  flex-direction: column;
-  align-items: stretch;
-  width: auto;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 4px;
-}
-
-.folder-list.grid-mode .folder-thumb {
-  width: 100%;
-  height: 72px;
-}
-
-.folder-list.grid-mode .folder-item-name {
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: center;

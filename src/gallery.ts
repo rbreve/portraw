@@ -26,8 +26,6 @@ const ICONS = {
     '<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M6 2.5L11 8l-5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   maximize:
     '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M1.5 5.5v-4h4M14.5 5.5v-4h-4M1.5 10.5v4h4M14.5 10.5v4h-4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  list:
-    '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><line x1="2" y1="4" x2="14" y2="4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="2" y1="12" x2="14" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
 };
 
 function iconButton(icon: string, title: string, className: string): HTMLButtonElement {
